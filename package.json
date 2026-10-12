@@ -1,8 +1,9 @@
 {
-  "name": "pwa-template",
+  "name": "volley-web-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2-2&p=f&t=KUiSkrsZaWPrVVwj-0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

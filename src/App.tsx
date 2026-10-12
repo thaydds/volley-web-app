@@ -1,6 +1,66 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
+function GearIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  )
+}
+
+function HomeScreen() {
+  return (
+    <div className="home-screen">
+      <header className="home-header">
+        <p className="home-description">
+          Tela inicial do app, com acesso rápido para iniciar uma nova partida,
+          consultar o ranking e visualizar as cartas dos jogadores. Também apresenta
+          os destaques do ranking.
+        </p>
+      </header>
+
+      <main className="home-main">
+        <section className="home-top-section">
+          <button className="card card--cartas">
+            <span className="card__text">Cartas</span>
+          </button>
+        </section>
+
+        <section className="home-center-section">
+          <button className="card card--montar-time">
+            <span className="card__text card__text--large">Montar o time!</span>
+          </button>
+        </section>
+
+        <section className="home-bottom-section">
+          <div className="bottom-actions">
+            <button className="action-btn action-btn--ranking">
+              <span>Ranking</span>
+            </button>
+            <button className="action-btn action-btn--partidas">
+              <span>Partidas</span>
+            </button>
+            <button className="action-btn action-btn--settings" aria-label="Configurações">
+              <GearIcon size={24} />
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
+}
+
 function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
 
@@ -19,52 +79,7 @@ function App() {
 
   return (
     <div className="app">
-      <header className="header">
-        <div className="header-content">
-          <h1>📱 PWA Template</h1>
-          <div className={`status ${isOnline ? 'online' : 'offline'}`}>
-            {isOnline ? '🟢 Online' : '🔴 Offline'}
-          </div>
-        </div>
-      </header>
-
-      <main className="main">
-        <section className="hero">
-          <h2>Hello World PWA</h2>
-          <p className="subtitle">
-            Template mobile-first pronto para produção
-          </p>
-        </section>
-
-        <section className="pwa-info">
-          <h3>✨ Recursos incluídos</h3>
-          <ul className="features-list">
-            <li>📱 Instalável como app nativo</li>
-            <li>🔄 Funciona offline (Service Worker)</li>
-            <li>🔁 Atualização automática</li>
-            <li>🌙 Dark mode automático</li>
-            <li>⚡ Vite + React + TypeScript</li>
-          </ul>
-          <button className="btn-primary" onClick={() => alert('Use o menu do navegador → "Adicionar à tela inicial"')}>
-            Como instalar
-          </button>
-        </section>
-
-        <section className="tech-stack">
-          <h3>Stack</h3>
-          <div className="badges">
-            <span className="badge">Vite</span>
-            <span className="badge">React 18</span>
-            <span className="badge">TypeScript</span>
-            <span className="badge">Workbox</span>
-            <span className="badge">ESLint</span>
-          </div>
-        </section>
-      </main>
-
-      <footer className="footer">
-        <p>PWA Template • Mobile-First • Feito com Vite + React</p>
-      </footer>
+      <HomeScreen />
 
       {!isOnline && (
         <div className="offline-banner">
