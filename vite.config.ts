@@ -70,8 +70,7 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: true,
-        navigateFallback: 'index.html'
+        enabled: false
       }
     })
   ],
