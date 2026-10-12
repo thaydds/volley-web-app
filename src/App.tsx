@@ -22,14 +22,6 @@ function GearIcon({ size = 24 }: { size?: number }) {
 function HomeScreen() {
   return (
     <div className="home-screen">
-      <header className="home-header">
-        <p className="home-description">
-          Tela inicial do app, com acesso rápido para iniciar uma nova partida,
-          consultar o ranking e visualizar as cartas dos jogadores. Também apresenta
-          os destaques do ranking.
-        </p>
-      </header>
-
       <main className="home-main">
         <section className="home-top-section">
           <button className="card card--cartas">
