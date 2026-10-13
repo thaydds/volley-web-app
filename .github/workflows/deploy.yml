@@ -25,8 +25,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          publish_branch: main
-          # Deploy to main branch root instead of gh-pages branch
+          publish_branch: gh-pages
           # This makes the site available at https://thaydds.github.io/volley-web-app/
           user_name: thaydds
           user_email: thayronedds@gmail.com
