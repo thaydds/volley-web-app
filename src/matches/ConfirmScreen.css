@@ -1,0 +1,37 @@
+.confirm-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  max-width: 100%;
+}
+
+.confirm-screen__title {
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.confirm-screen__date {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.confirm-screen__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.confirm-screen__confirm {
+  background: #000000;
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  font-size: 1.125rem;
+  min-height: 48px;
+}
+
+.confirm-screen__confirm:disabled {
+  opacity: 0.5;
+}

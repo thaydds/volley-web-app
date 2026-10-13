@@ -1,0 +1,81 @@
+.winner-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 20;
+}
+
+.winner-modal {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: var(--space-5);
+  width: 100%;
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  outline: none;
+}
+
+.winner-modal__title {
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.winner-modal__subtitle {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.winner-modal__teams {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.winner-modal__team {
+  flex: 1;
+  border: 3px solid #000000;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  font-size: 1rem;
+  min-height: 48px;
+  background: var(--color-surface);
+}
+
+.winner-modal__team--selected {
+  background: #000000;
+  color: #ffffff;
+}
+
+.winner-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.winner-modal__confirm {
+  background: #000000;
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  font-size: 1.125rem;
+  min-height: 48px;
+}
+
+.winner-modal__confirm:disabled {
+  opacity: 0.5;
+}
+
+.winner-modal__cancel {
+  background: #848484;
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  font-size: 1rem;
+  min-height: 44px;
+}

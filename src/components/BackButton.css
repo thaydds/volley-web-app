@@ -1,0 +1,27 @@
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: #000000;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.back-button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.back-button:active {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.back-button:focus-visible {
+  outline: 2px solid var(--color-chip-border);
+  outline-offset: 2px;
+}

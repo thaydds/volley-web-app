@@ -10,6 +10,10 @@
   --color-text: #1e293b;
   --color-text-muted: #64748b;
   --color-border: #e2e8f0;
+  --color-chip: #d9d9d9;
+  --color-chip-pressed: #a1e0ff;
+  --color-chip-border: #4c85ff;
+  --color-disabled: #848484;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -24,7 +28,8 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
@@ -60,6 +65,28 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+}
+
+/*
+ * Player name chip shared by the roster, draw and confirm screens so the
+ * confirm step stays visually consistent with the previous one.
+ */
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-chip);
+  border: none;
+  border-radius: 24px;
+  padding: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: #000000;
+  min-height: 44px;
+}
+
+.player-chip__name {
+  font-weight: 400;
 }
 
 a {

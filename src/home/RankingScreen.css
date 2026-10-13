@@ -1,0 +1,97 @@
+.ranking-screen {
+  max-width: 393px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+.ranking-screen__title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #000000;
+  text-align: center;
+}
+
+.ranking-screen__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ranking-screen__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: background 0.2s;
+}
+
+.ranking-screen__item:hover {
+  background: #e9e9e9;
+}
+
+.ranking-screen__item--dragging {
+  background: #e9e9e9;
+  opacity: 0.75;
+  cursor: grabbing;
+}
+
+.ranking-screen__rank {
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 30px;
+  color: #666666;
+}
+
+.ranking-screen__player-name {
+  flex: 1;
+  font-size: 18px;
+  color: #000000;
+}
+
+.ranking-screen__present {
+  color: #ffd700;
+  font-size: 14px;
+}
+
+.ranking-screen__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666666;
+  font-size: 16px;
+}
+
+.ranking-screen__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.ranking-screen__back {
+  flex: 1;
+  background: #d9d9d9;
+  border: none;
+  border-radius: 24px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #000000;
+  transition: background 0.15s;
+}
+
+.ranking-screen__back:active {
+  background: #bfbfbf;
+}

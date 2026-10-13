@@ -1,0 +1,85 @@
+.draw-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  max-width: 100%;
+}
+
+.draw-screen__title {
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.draw-screen__count {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.draw-screen__panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.team-panel {
+  flex: 1;
+  min-width: 0;
+  background: var(--color-chip);
+  border: 1px solid #000000;
+  border-radius: 24px;
+  padding: var(--space-3);
+  min-height: 96px;
+}
+
+.team-panel__title {
+  font-size: 1.125rem;
+  text-align: center;
+  margin-bottom: var(--space-3);
+}
+
+.team-panel__list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/*
+ * Compound selectors (0,2,0) keep these winning regardless of stylesheet
+ * order, since the base `.player-chip` rule lives in index.css.
+ */
+.player-chip.player-chip--team {
+  padding: 10px;
+  background: var(--color-chip-pressed);
+  border: 3px solid var(--color-chip-border);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.player-chip.player-chip--dragging {
+  opacity: 0.75;
+  cursor: grabbing;
+}
+
+.draw-screen__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.draw-screen__confirm,
+.draw-screen__redraw {
+  background: #000000;
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  font-size: 1.125rem;
+  min-height: 48px;
+}
+
+.draw-screen__redraw {
+  font-size: 1rem;
+}

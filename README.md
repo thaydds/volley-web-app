@@ -1,36 +1,36 @@
 # Volley Web App
 
-A PWA (Progressive Web App) for volleyball built with Vite + React + TypeScript.
+PWA mobile-first para peladas de vôlei: montar times com quem veio, sortear, acompanhar — funcionando offline, instalável no celular. Feito com Vite + React + TypeScript.
+
+## Telas da v1
+
+- **Home** — entrada com acesso a Partidas (Cartas e Configurações entram no futuro).
+- **Partidas / Quem veio hoje?** — cadastra jogadores, marca presentes, sorteia Time A × Time B, ajusta manualmente e vê os times listados.
+- **Ranking** — entra na próxima unidade (U3).
 
 ## Design
 
-- **Figma Design**: [volei-app](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2-2&p=f&t=KUiSkrsZaWPrVVwj-0)
+- **Figma**: [volei-app](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2-2&p=f&t=KUiSkrsZaWPrVVwj-0)
+- Cartões `#D9D9D9` com raio 24px, Inter, layout 393px fiel ao Figma.
 
-## Tech Stack
+## Dados
 
-- React 18
-- TypeScript
-- Vite
-- Workbox (PWA support)
+Só no aparelho (localStorage, chave versionada `volley-v1`); sem backend nesta v1. Leitura inválida redefine com aviso.
 
-## Development
+## Comandos
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+npm install     # dependências
+npm run dev     # desenvolvimento
+npm run build   # build de produção
+npm run preview # prévia do build
+npx vitest run src/roster src/matchmaking src/home  # testes da unidade
 ```
 
-## PWA Features
+## Qualidade
 
-- Offline support via Service Worker
-- Installable on mobile devices
-- Responsive design
+BDD (Vitest + Testing Library), cobertura ≥80%, `tsc -b` verde, Prettier + ESLint. Branches curtas com PR revisado e squash; Conventional Commits.
+
+## Roadmap
+
+U2 Partidas (confirmação, histórico, vencedor), U3 Ranking; futuro: Cartas, Configurações (tamanho da fonte), API.
