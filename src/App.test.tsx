@@ -29,7 +29,9 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
     // Check that ranking screen is rendered (has the title "Ranking")
     expect(screen.getByText('Ranking')).toBeInTheDocument();
     // Check that the empty state message is shown when no players
-    expect(screen.getByText('Cadastre jogadores e finalize partidas para ver o ranking.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Cadastre jogadores e finalize partidas para ver o ranking.')
+    ).toBeInTheDocument();
   });
 
   it('fluxo F1: Home → Partidas → Sortear → times visíveis → volta ao início', async () => {

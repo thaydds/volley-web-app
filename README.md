@@ -2,11 +2,12 @@
 
 PWA mobile-first para peladas de vôlei: montar times com quem veio, sortear, acompanhar — funcionando offline, instalável no celular. Feito com Vite + React + TypeScript.
 
-## Telas da v1
+## Telas
 
-- **Home** — entrada com acesso a Partidas (Cartas e Configurações entram no futuro).
+- **Home** — entrada com acesso a Partidas, Histórico e Ranking.
 - **Partidas / Quem veio hoje?** — cadastra jogadores, marca presentes, sorteia Time A × Time B, ajusta manualmente e vê os times listados.
-- **Ranking** — entra na próxima unidade (U3).
+- **Confirmação / Histórico** — confirma a partida, define o vencedor e lista o histórico com rematch e exclusão.
+- **Ranking** — reordena jogadores por arrastar e soltar.
 
 ## Design
 
@@ -20,17 +21,27 @@ Só no aparelho (localStorage, chave versionada `volley-v1`); sem backend nesta 
 ## Comandos
 
 ```bash
-npm install     # dependências
-npm run dev     # desenvolvimento
-npm run build   # build de produção
-npm run preview # prévia do build
-npx vitest run src/roster src/matchmaking src/home  # testes da unidade
+npm install         # dependências
+npm run dev         # desenvolvimento
+npm run build       # build de produção
+npm run preview     # prévia do build
+
+npm run lint        # ESLint
+npm run format      # Prettier (--write)
+npm run format:check
+npm run typecheck   # tsc -b
+npm test            # testes (Vitest)
+npm run test:coverage  # testes com cobertura
 ```
 
 ## Qualidade
 
-BDD (Vitest + Testing Library), cobertura ≥80%, `tsc -b` verde, Prettier + ESLint. Branches curtas com PR revisado e squash; Conventional Commits.
+BDD (Vitest + Testing Library), cobertura ≥80% com thresholds no CI, `tsc -b` verde, Prettier + ESLint. Branches curtas com PR revisado e squash; Conventional Commits. O workflow `CI` roda lint, formatação, typecheck e testes a cada push/PR; o `Deploy` publica no GitHub Pages a partir de `main`.
+
+## Deploy
+
+Publicado via GitHub Actions em <https://thaydds.github.io/volley-web-app/> (subpath `/volley-web-app/`, refletido no `base`, `scope` e `start_url` do PWA).
 
 ## Roadmap
 
-U2 Partidas (confirmação, histórico, vencedor), U3 Ranking; futuro: Cartas, Configurações (tamanho da fonte), API.
+Futuro: Cartas, Configurações (tamanho da fonte), API.

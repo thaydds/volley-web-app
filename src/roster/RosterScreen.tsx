@@ -32,7 +32,13 @@ interface RosterScreenProps {
   onBack: () => void;
 }
 
-export function RosterScreen({ players, notice, onPlayersChange, onDraw, onBack }: RosterScreenProps) {
+export function RosterScreen({
+  players,
+  notice,
+  onPlayersChange,
+  onDraw,
+  onBack,
+}: RosterScreenProps) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const presentCount = presentPlayers(players).length;
