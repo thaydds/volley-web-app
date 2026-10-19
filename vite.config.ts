@@ -1,40 +1,43 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+
+// Deployed under a GitHub Pages subpath, so scope/start_url/icons must use it too.
+const base = '/volley-web-app/';
 
 export default defineConfig({
-  base: '/volley-web-app/',
+  base,
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
+      registerType: 'prompt',
+      includeAssets: ['robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'PWA Template',
-        short_name: 'PWA',
-        description: 'Mobile-first PWA template with Vite + React + TypeScript',
+        name: 'Volley — Pelada de Vôlei',
+        short_name: 'Volley',
+        description: 'Monte times, sorteie e acompanhe peladas de vôlei — offline e instalável.',
+        lang: 'pt-BR',
         theme_color: '#3b82f6',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait-primary',
-        scope: '/',
-        start_url: '/',
+        scope: base,
+        start_url: base,
         icons: [
           {
-            src: '/icon-192.png',
+            src: `${base}icon-192.png`,
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any maskable',
           },
           {
-            src: '/icon-512.png',
+            src: `${base}icon-512.png`,
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
-          }
+            purpose: 'any maskable',
+          },
         ],
-        categories: ['utilities', 'developer'],
-        screenshots: []
+        categories: ['sports', 'utilities'],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
@@ -47,12 +50,12 @@ export default defineConfig({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
+                maxAgeSeconds: 60 * 60 * 24 * 365,
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
+                statuses: [0, 200],
+              },
+            },
           },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
@@ -61,22 +64,22 @@ export default defineConfig({
               cacheName: 'gstatic-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
+                maxAgeSeconds: 60 * 60 * 24 * 365,
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
       devOptions: {
-        enabled: false
-      }
-    })
+        enabled: false,
+      },
+    }),
   ],
   server: {
     port: 3000,
-    open: true
-  }
-})
+    open: true,
+  },
+});

@@ -4,12 +4,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-declare const UPDATE_SW: () => void;
-
-registerSW({
+const updateSW = registerSW({
   onNeedRefresh() {
     if (confirm('Nova versão disponível. Atualizar?')) {
-      UPDATE_SW();
+      void updateSW(true);
     }
   },
   onOfflineReady() {
