@@ -4,12 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-const updateSW = registerSW({
-  onNeedRefresh() {
-    if (confirm('Nova versão disponível. Atualizar?')) {
-      void updateSW(true);
-    }
-  },
+registerSW({
   onOfflineReady() {
     console.log('App pronto para uso offline');
   },

@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['robots.txt', 'apple-touch-icon.png'],
       manifest: {
         name: 'Volley — Pelada de Vôlei',
