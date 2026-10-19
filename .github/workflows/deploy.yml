@@ -16,8 +16,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build
         run: npm run build
       - name: Deploy to GitHub Pages
@@ -29,4 +30,4 @@ jobs:
           # This makes the site available at https://thaydds.github.io/volley-web-app/
           user_name: thaydds
           user_email: thayronedds@gmail.com
-          commit_message: "Deploy: update dist [skip ci]"
+          commit_message: 'Deploy: update dist [skip ci]'

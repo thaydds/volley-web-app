@@ -1,0 +1,9 @@
+node_modules
+dist
+dev-dist
+coverage
+.aidlc
+aidlc
+AGENTS.md
+package-lock.json
+public/manifest.webmanifest

@@ -16,7 +16,16 @@ export default defineConfig({
         'src/matchmaking/**/*.{ts,tsx}',
         'src/home/**/*.{ts,tsx}',
         'src/matches/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
+        '!**/types.ts',
+        '!src/home/navigation.ts',
       ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
     },
   },
 });
