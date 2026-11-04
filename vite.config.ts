@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { tokens } from '@beachsports/tokens';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Deployed under a GitHub Pages subpath, so scope/start_url/icons must use it too.
@@ -13,12 +14,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Volley — Pelada de Vôlei',
-        short_name: 'Volley',
+        name: 'Beach Sports — Vôlei',
+        short_name: 'Beach Sports',
         description: 'Monte times, sorteie e acompanhe peladas de vôlei — offline e instalável.',
         lang: 'pt-BR',
-        theme_color: '#3b82f6',
-        background_color: '#ffffff',
+        theme_color: tokens['--ds-color-action-default'],
+        background_color: tokens['--ds-color-bg-base'],
         display: 'standalone',
         orientation: 'portrait-primary',
         scope: base,
@@ -80,6 +81,6 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
-    open: true,
+    open: false,
   },
 });

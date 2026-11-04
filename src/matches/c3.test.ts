@@ -40,9 +40,9 @@ describe('C3 — partidas → Ranking (contrato shared-schema)', () => {
     expect(standings.Bia).toEqual({ points: 0, wins: 0, losses: 1 });
   });
 
-  it('todo data-testid interativo da unidade segue o padrão kebab-case estável', async () => {
+  it('os módulos do fluxo atualizado carregam sem depender da etapa removida', async () => {
     const modules = await Promise.all([
-      import('./ConfirmScreen'),
+      import('./MatchSummary'),
       import('./WinnerModal'),
       import('./HistoryScreen'),
       import('./DeleteModal'),

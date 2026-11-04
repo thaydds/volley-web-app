@@ -62,3 +62,7 @@ aidlc/spaces/*/intents/*/runtime-graph.json
 aidlc/spaces/*/intents/*/.aidlc-*
 aidlc/diagnostics/
 # END AI-DLC:gitignore
+
+# Browser validation
+test-results/
+playwright-report/

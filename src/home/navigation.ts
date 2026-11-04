@@ -1,1 +1,1 @@
-export type View = 'home' | 'roster' | 'draw' | 'confirm' | 'history' | 'ranking';
+export type View = 'home' | 'roster' | 'draw' | 'history' | 'ranking' | 'settings' | 'onboarding';

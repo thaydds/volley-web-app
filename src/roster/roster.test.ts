@@ -88,3 +88,14 @@ describe('US1.2 — Gerenciar elenco (cenários BDD)', () => {
     expect(reloaded.notice).toMatch(/aviso|redefin|recuper/i);
   });
 });
+
+describe('preservação do histórico ao salvar elenco', () => {
+  it('mantém partidas e outras fatias de volley-v1 quando a presença muda', () => {
+    const matches = [
+      { number: 1, date: '04/11/2026', teamA: ['Lana'], teamB: ['Bia'], winner: 'A' },
+    ];
+    localStorage.setItem('volley-v1', JSON.stringify({ players: [], matches }));
+    saveRoster([{ name: 'Lana', present: true }]);
+    expect(JSON.parse(localStorage.getItem('volley-v1') as string).matches).toEqual(matches);
+  });
+});

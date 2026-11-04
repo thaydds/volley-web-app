@@ -18,7 +18,7 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
   it('AC1.1.1: Given Home, When toco em Partidas, Then vejo "Quem veio hoje?"', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByTestId('home-matches-button'));
+    await user.click(screen.getByTestId('home-montar-time'));
     expect(screen.getByText('Quem veio hoje?')).toBeInTheDocument();
   });
 
@@ -27,7 +27,7 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
     render(<App />);
     await user.click(screen.getByTestId('home-ranking-button'));
     // Check that ranking screen is rendered (has the title "Ranking")
-    expect(screen.getByText('Ranking')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Ranking' })).toBeInTheDocument();
     // Check that the empty state message is shown when no players
     expect(
       screen.getByText('Cadastre jogadores e finalize partidas para ver o ranking.')
@@ -37,7 +37,7 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
   it('fluxo F1: Home → Partidas → Sortear → times visíveis → volta ao início', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByTestId('home-matches-button'));
+    await user.click(screen.getByTestId('home-montar-time'));
     await user.type(screen.getByTestId('roster-name-input'), 'Lana');
     await user.click(screen.getByTestId('roster-add-button'));
     await user.type(screen.getByTestId('roster-name-input'), 'Bia');
@@ -49,7 +49,7 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
     expect(screen.getByTestId('draw-team-b')).toBeInTheDocument();
     await user.click(screen.getByTestId('draw-back-button'));
     await user.click(screen.getByTestId('roster-back-button'));
-    expect(screen.getByTestId('home-matches-button')).toBeInTheDocument();
+    expect(screen.getByTestId('home-montar-time')).toBeInTheDocument();
   });
 
   it('AC1.1.3/F2: sem rede, banner offline visível e fluxos intactos (BR3.3)', async () => {
@@ -57,12 +57,13 @@ describe('US1.1 — Navegação do app (cenários BDD)', () => {
     setOnline(false);
     render(<App />);
     expect(screen.getByTestId('offline-banner')).toBeInTheDocument();
-    await user.click(screen.getByTestId('home-matches-button'));
+    await user.click(screen.getByTestId('home-montar-time'));
     expect(screen.getByText('Quem veio hoje?')).toBeInTheDocument();
   });
 
   it('BR3.4: guarda contra rolagem horizontal presente no CSS do shell', () => {
     const css = fs.readFileSync(path.join('src', 'App.css'), 'utf8');
-    expect(css).toMatch(/overflow-x\s*:\s*(hidden|clip)/);
+    expect(css).toMatch(/min-width:\s*0/);
+    expect(css).toMatch(/overflow:\s*auto/);
   });
 });

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import { SettingsScreen } from './settings/SettingsScreen';
+import { loadPreferences, savePreferences, type Preferences } from './settings/preferences';
+import { OnboardingScreen } from './home/OnboardingScreen';
 import { Home } from './home/Home';
 import { RankingScreen } from './home/RankingScreen';
 import type { View } from './home/navigation';
 import { drawTeams, movePlayer } from './matchmaking/draw';
 import type { TeamSide } from './matchmaking/draw';
 import { DrawScreen } from './matchmaking/DrawScreen';
-import { ConfirmScreen } from './matches/ConfirmScreen';
 import { WinnerModal } from './matches/WinnerModal';
 import { HistoryScreen } from './matches/HistoryScreen';
 import type { Match, WinnerSide } from './matches/types';
@@ -22,6 +24,22 @@ import type { Player, Teams } from './roster/types';
 function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [view, setView] = useState<View>('home');
+  const [preferences, setPreferences] = useState(loadPreferences);
+  const [preferencesNotice, setPreferencesNotice] = useState('');
+  useEffect(() => {
+    document.documentElement.dataset.theme = preferences.theme;
+    document.documentElement.dataset.fontSize = preferences.fontSize;
+    const color = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ds-color-bg-base')
+      .trim();
+    if (color) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color);
+  }, [preferences]);
+  function handlePreferences(next: Preferences) {
+    setPreferences(next);
+    setPreferencesNotice(
+      savePreferences(next) ? '' : 'Não foi possível salvar os ajustes neste aparelho.'
+    );
+  }
   const [initial] = useState<LoadedRoster>(loadRoster);
   const [players, setPlayers] = useState<Player[]>(initial.players);
   const [notice] = useState<string | null>(initial.notice);
@@ -30,7 +48,6 @@ function App() {
   const [matches, setMatches] = useState<Match[]>(matchesInitial.matches);
   const [matchesNotice] = useState<string | null>(matchesInitial.notice);
   const [pendingWinner, setPendingWinner] = useState<Match | null>(null);
-  const [confirmDate, setConfirmDate] = useState<string>('');
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -60,14 +77,9 @@ function App() {
     setTeams((current) => (current === null ? current : movePlayer(current, name, toSide)));
   }
 
-  function handleOpenConfirm(): void {
-    setConfirmDate(formatMatchDate(new Date()));
-    setView('confirm');
-  }
-
   function handleFinalize(): void {
     if (teams === null) return;
-    const created = createMatch(teams, confirmDate, nextMatchNumber(matches));
+    const created = createMatch(teams, formatMatchDate(new Date()), nextMatchNumber(matches));
     const next = [...matches, created];
     setMatches(next);
     saveMatches(next);
@@ -106,9 +118,22 @@ function App() {
           onMatches={() => setView('roster')}
           onRanking={() => setView('ranking')}
           onHistory={() => setView('history')}
+          onSettings={() => setView('settings')}
         />
       )}
 
+      {view === 'settings' && (
+        <SettingsScreen
+          onHelp={() => setView('onboarding')}
+          preferences={preferences}
+          onChange={handlePreferences}
+          onBack={() => setView('home')}
+        />
+      )}
+      {view === 'onboarding' && (
+        <OnboardingScreen onStart={() => setView('roster')} onBack={() => setView('home')} />
+      )}
+      {preferencesNotice && <p role="status">{preferencesNotice}</p>}
       {view === 'roster' && (
         <RosterScreen
           players={players}
@@ -122,21 +147,13 @@ function App() {
       {view === 'draw' && teams !== null && (
         <DrawScreen
           teams={teams}
-          presentCount={presentPlayers(players).length}
+          presentCount={teams.A.length + teams.B.length}
           onMove={handleMove}
-          onRedraw={handleDraw}
-          onConfirm={handleOpenConfirm}
-          onBack={() => setView('roster')}
-        />
-      )}
-
-      {view === 'confirm' && teams !== null && (
-        <ConfirmScreen
-          number={nextMatchNumber(matches)}
-          date={confirmDate}
-          teams={teams}
+          onRedraw={() => {
+            if (teams) setTeams(drawTeams([...teams.A, ...teams.B]));
+          }}
           onConfirm={handleFinalize}
-          onBack={() => setView('draw')}
+          onBack={() => setView('roster')}
         />
       )}
 
@@ -154,11 +171,7 @@ function App() {
       )}
 
       {view === 'ranking' && (
-        <RankingScreen
-          players={players}
-          onPlayersChange={handlePlayersChange}
-          onBack={() => setView('home')}
-        />
+        <RankingScreen matches={matches} players={players} onBack={() => setView('home')} />
       )}
 
       {matchesNotice !== null && (

@@ -42,6 +42,14 @@ export function loadRoster(): LoadedRoster {
 }
 
 export function saveRoster(players: Player[]): void {
-  const shape: StoredShape = { players };
+  let root: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+      root = parsed as Record<string, unknown>;
+  } catch {
+    /* Preserve valid slices; corrupt roots are replaced. */
+  }
+  const shape = { ...root, players };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(shape));
 }

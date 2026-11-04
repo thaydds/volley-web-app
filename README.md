@@ -1,47 +1,46 @@
-# Volley Web App
+# Beach Sports · Volley Web App
 
-PWA mobile-first para peladas de vôlei: montar times com quem veio, sortear, acompanhar — funcionando offline, instalável no celular. Feito com Vite + React + TypeScript.
+PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publicados **@beachsports/components 0.4.1** e **@beachsports/tokens 0.1.0**.
 
-## Telas
+[Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [Biblioteca e documentação](https://thaydds.github.io/Beach-Sports-DS/) · [App publicado](https://thaydds.github.io/volley-web-app/)
 
-- **Home** — entrada com acesso a Partidas, Histórico e Ranking.
-- **Partidas / Quem veio hoje?** — cadastra jogadores, marca presentes, sorteia Time A × Time B, ajusta manualmente e vê os times listados.
-- **Confirmação / Histórico** — confirma a partida, define o vencedor e lista o histórico com rematch e exclusão.
-- **Ranking** — reordena jogadores por arrastar e soltar.
+## Fluxo
 
-## Design
+- **Início:** montar time, partidas, ranking e ajustes. Cartas fica indisponível porque ainda não tem fluxo definido.
+- **Seleção:** Chip MD alterna presença; contador usa os dados reais. Campo de cadastro sempre visível, sem seção expansível.
+- **Times definidos:** sorteio, novo sorteio e movimentação por arraste. Alternativa por teclado/toque: selecionar jogador → Mover para Time A/B. A mudança é anunciada e o foco volta ao jogador.
+- **Vencedor:** finalizar registra a partida; confirmação escolhe A/B. Cancelar mantém o registro sem vencedor.
+- **Histórico e detalhes:** todas as partidas locais têm detalhe próprio, revanche e exclusão com confirmação. Placar ausente aparece como `—`.
+- **Ranking:** usa a regra já existente em `scoring.ts`: uma vitória soma um ponto; empates recebem a mesma posição. Participantes históricos continuam aparecendo.
+- **Ajustes:** temas Light/Dark e fonte padrão, grande (125%) ou muito grande (150%), salvos no aparelho. “Como usar” abre o onboarding do Figma.
 
-- **Figma**: [volei-app](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2-2&p=f&t=KUiSkrsZaWPrVVwj-0)
-- Cartões `#D9D9D9` com raio 24px, Inter, layout 393px fiel ao Figma.
-
-## Dados
-
-Só no aparelho (localStorage, chave versionada `volley-v1`); sem backend nesta v1. Leitura inválida redefine com aviso.
-
-## Comandos
+## Desenvolvimento
 
 ```bash
-npm install         # dependências
-npm run dev         # desenvolvimento
-npm run build       # build de produção
-npm run preview     # prévia do build
-
-npm run lint        # ESLint
-npm run format      # Prettier (--write)
-npm run format:check
-npm run typecheck   # tsc -b
-npm test            # testes (Vitest)
-npm run test:coverage  # testes com cobertura
+npm ci
+npm run dev
 ```
 
-## Qualidade
+O servidor usa a base `/volley-web-app/`. Estilos e tokens públicos são importados uma única vez em `src/main.tsx`. A fonte Inter fica hospedada localmente e entra no cache offline, com licença em `src/assets/Inter-LICENSE.txt`.
 
-BDD (Vitest + Testing Library), cobertura ≥80% com thresholds no CI, `tsc -b` verde, Prettier + ESLint. Branches curtas com PR revisado e squash; Conventional Commits. O workflow `CI` roda lint, formatação, typecheck e testes a cada push/PR; o `Deploy` publica no GitHub Pages a partir de `main`.
+## Validação
 
-## Deploy
+```bash
+npm run lint
+npm run format:check
+npm run typecheck
+npm run test:coverage
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
 
-Publicado via GitHub Actions em <https://thaydds.github.io/volley-web-app/> (subpath `/volley-web-app/`, refletido no `base`, `scope` e `start_url` do PWA).
+Vitest verifica regras, armazenamento e interações. Playwright usa o build de produção em 393px, 320px e desktop, com auditorias axe nos temas Light/Dark, reflow, preferências, movimento, foco e recarregamento offline. Evidências ficam em `test-results/`; relatório em `playwright-report/`.
 
-## Roadmap
+## Dados e deploy
 
-Futuro: Cartas, Configurações (tamanho da fonte), API.
+Elenco e partidas continuam em `localStorage` (`volley-v1`), sem backend. Salvar presença preserva o histórico. Ajustes usam `volley-preferences-v1`. Os dados são específicos do aparelho/origem; limpar o armazenamento do navegador os remove.
+
+CI valida PRs; o workflow Deploy publica `main` no GitHub Pages. A versão da biblioteca fica fixada no lockfile; releases do DS não atualizam o app automaticamente.
+
+As decisões e lacunas do Figma estão em [docs/redesign.md](docs/redesign.md).

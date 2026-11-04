@@ -1,86 +1,49 @@
-import { DragDropProvider } from '@dnd-kit/react';
-import type { DragEndEvent } from '@dnd-kit/react';
-import { useSortable } from '@dnd-kit/react/sortable';
-import { BackButton } from '../components/BackButton';
+import { Ranking, RankingItem, Typography } from '@beachsports/components';
+import { Screen } from '../components/Screen';
+import { computeStandings } from '../matches/scoring';
+import type { Match } from '../matches/types';
 import type { Player } from '../roster/types';
-import './RankingScreen.css';
-
 interface RankingScreenProps {
   players: Player[];
-  onPlayersChange: (players: Player[]) => void;
+  matches?: Match[];
   onBack: () => void;
 }
-
-function rankingOrder(items: Player[], from: number, to: number): Player[] {
-  if (from < 0 || from >= items.length) {
-    return items;
-  }
-  const next = [...items];
-  const [moved] = next.splice(from, 1);
-  if (moved === undefined) {
-    return items;
-  }
-  next.splice(to, 0, moved);
-  return next;
-}
-
-interface RankingItemProps {
-  player: Player;
-  index: number;
-}
-
-function RankingItem({ player, index }: RankingItemProps) {
-  const { ref, isDragging } = useSortable({ id: player.name, index });
-
-  return (
-    <li
-      ref={ref}
-      className={`ranking-screen__item${isDragging ? ' ranking-screen__item--dragging' : ''}`}
-      data-testid="ranking-item"
-      data-player-name={player.name}
-    >
-      <span className="ranking-screen__rank">{index + 1}</span>
-      <span className="ranking-screen__player-name">{player.name}</span>
-      <span className="ranking-screen__present">{player.present ? '★' : ''}</span>
-    </li>
+export function RankingScreen({ players, matches = [], onBack }: RankingScreenProps) {
+  const standings = computeStandings(matches);
+  const names = Array.from(new Set([...players.map((p) => p.name), ...Object.keys(standings)]));
+  const sorted = names.sort(
+    (a, b) =>
+      (standings[b]?.points ?? 0) - (standings[a]?.points ?? 0) || a.localeCompare(b, 'pt-BR')
   );
-}
-
-export function RankingScreen({ players, onPlayersChange, onBack }: RankingScreenProps) {
-  function handleDragEnd(event: DragEndEvent): void {
-    const { source, target } = event.operation;
-    if (event.canceled || !source || !target || source.id === target.id) {
-      return;
-    }
-
-    const from = players.findIndex((player) => player.name === source.id);
-    const to = players.findIndex((player) => player.name === target.id);
-    if (from === -1 || to === -1 || from === to) {
-      return;
-    }
-
-    onPlayersChange(rankingOrder(players, from, to));
-  }
-
+  const positions = new Map<number, number>();
+  const rows = sorted.map((name, index) => {
+    const stats = standings[name] ?? { points: 0, wins: 0, losses: 0 };
+    if (!positions.has(stats.points)) positions.set(stats.points, index + 1);
+    return { name, ...stats, position: positions.get(stats.points) ?? index + 1 };
+  });
   return (
-    <div className="ranking-screen">
-      <BackButton onClick={onBack} label="Voltar" testId="ranking-back-button" />
-
-      <h1 className="ranking-screen__title">Ranking</h1>
-
-      {players.length === 0 ? (
-        <p className="ranking-screen__empty">
-          Cadastre jogadores e finalize partidas para ver o ranking.
-        </p>
+    <Screen
+      title="Ranking"
+      description="Jogadores · vitórias · derrotas · pontos"
+      badge="Ranking"
+      onBack={onBack}
+      backTestId="ranking-back-button"
+    >
+      {!sorted.length ? (
+        <Typography>Cadastre jogadores e finalize partidas para ver o ranking.</Typography>
       ) : (
-        <DragDropProvider onDragEnd={handleDragEnd}>
-          <ul className="ranking-screen__list">
-            {players.map((player, index) => (
-              <RankingItem key={player.name} player={player} index={index} />
-            ))}
-          </ul>
-        </DragDropProvider>
+        <Ranking title="Ranking de jogadores" density="compact">
+          {rows.map((row) => (
+            <RankingItem
+              key={row.name}
+              position={row.position}
+              playerName={row.name}
+              points={row.points}
+              secondaryInfo={`${row.wins} vitórias · ${row.losses} derrotas`}
+            />
+          ))}
+        </Ranking>
       )}
-    </div>
+    </Screen>
   );
 }

@@ -40,7 +40,7 @@ describe('US1.7 — Histórico, exclusão e revanche (cenários BDD, M5)', () =>
     );
     expect(screen.getByTestId('matches-card-1')).toHaveTextContent('#001');
     expect(screen.getByTestId('matches-winner-badge-1')).toHaveTextContent('Time A');
-    expect(screen.getByTestId('matches-card-2')).toHaveTextContent('Sem vencedor');
+    expect(screen.getByTestId('matches-winner-badge-2')).toHaveTextContent('Sem vencedor');
   });
 
   it('AC1.7.2: Given cartão aberto, When excluo com confirmação nomeada, Then a partida some da lista', async () => {
@@ -58,6 +58,7 @@ describe('US1.7 — Histórico, exclusão e revanche (cenários BDD, M5)', () =>
     await user.click(screen.getByTestId('matches-delete-open-1'));
     expect(screen.getByTestId('matches-delete-modal')).toHaveTextContent('#001');
     expect(screen.getByTestId('matches-delete-modal')).toHaveTextContent('12/10/2026');
+    expect(screen.getByTestId('matches-delete-cancel-button')).toHaveFocus();
     await user.click(screen.getByTestId('matches-delete-confirm-button'));
     expect(onDelete).toHaveBeenCalledWith(1);
   });
@@ -107,5 +108,6 @@ describe('US1.7 — Histórico, exclusão e revanche (cenários BDD, M5)', () =>
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByTestId('matches-delete-modal')).toHaveTextContent('#001');
     expect(screen.getByTestId('matches-delete-modal')).toHaveTextContent('12/10/2026');
+    expect(screen.getByTestId('matches-delete-cancel-button')).toHaveFocus();
   });
 });

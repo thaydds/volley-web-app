@@ -68,3 +68,14 @@ describe('DrawScreen — comportamento (US1.3)', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
+
+it('seleção oferece alternativa ao gesto e permite cancelar sem mover', async () => {
+  const user = userEvent.setup();
+  const { onMove } = renderDraw();
+  await user.click(screen.getByRole('button', { name: 'Lana' }));
+  await user.click(screen.getByRole('button', { name: 'Cancelar movimento' }));
+  expect(onMove).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Lana' }));
+  await user.click(screen.getByRole('button', { name: 'Mover para Time B' }));
+  expect(onMove).toHaveBeenCalledWith('Lana', 'B');
+});
