@@ -91,6 +91,14 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByTestId('matches-card-1').click();
     await expect(page.getByRole('heading', { name: 'Detalhes da partida' })).toBeVisible();
     await expect(page.locator('[data-score-match]')).toContainText('—');
+    if (testInfo.project.name === 'mobile') {
+      const teams = page.locator('[data-score-match] [data-slot="team"]');
+      const first = await teams.first().boundingBox();
+      const second = await teams.last().boundingBox();
+      expect(second!.y).toBeCloseTo(first!.y, 1);
+      expect(second!.x).toBeGreaterThan(first!.x);
+    }
+
     await audit(page);
     await page.screenshot({ path: testInfo.outputPath(`detail-${theme}.png`) });
     await page.getByTestId('matches-delete-open-1').click();
@@ -108,6 +116,11 @@ for (const theme of ['light', 'dark'] as const) {
     ).toHaveLength(1);
     await page.getByTestId('home-ranking-button').click();
     await expect(page.getByRole('table')).toBeVisible();
+    if (testInfo.project.name === 'mobile') {
+      await expect(page.getByRole('columnheader').first()).toBeVisible();
+      await expect(page.locator('[data-ranking] tbody')).toHaveCSS('display', 'table-row-group');
+    }
+
     await audit(page);
     await page.screenshot({ path: testInfo.outputPath(`ranking-${theme}.png`) });
   });

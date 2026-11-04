@@ -25,7 +25,7 @@ O guia de presença e movimento é o node `2130:14057`. Dark troca os valores da
 - Cabeçalho e rodapé permanecem separados do conteúdo rolável. Layout móvel com largura máxima de 36rem no desktop, sem criar uma tela desktop não especificada.
 - Inter local com licença preservada; nenhum serviço de fontes externo é necessário para leitura offline.
 - Removidos o CSS antigo, chips locais e a etapa redundante de confirmação: os times são finalizados diretamente, conforme o fluxo do redesign.
-- ScoreMatch e Ranking mantêm o reflow do pacote 0.4.0: em contêineres estreitos, os times empilham e a tabela passa a blocos no móvel; o Figma mostra duas colunas no detalhe e três colunas no ranking em 393px. Isso requer ajuste futuro na responsividade do DS para paridade exata, sem sobrescrever seletores internos no app.
+- ScoreMatch e Ranking usam a correção responsiva publicada em `@beachsports/components@0.4.1`: duas colunas no detalhe e três no ranking em 393px, com reflow preservado em 320px e texto ampliado. A correção foi feita no DS, sem sobrescrever seus seletores internos no app.
 - Histórico tem Card passivo com botão “Ver partida”, sem transformar o contêiner em botão nem aninhar controles. Detalhes usam ScoreMatch somente quando há vencedor confirmado; um registro sem vencedor não é anunciado como “Ao vivo”.
 - Ranking aplica a função de pontuação existente do app, em vez de copiar as pontuações ilustrativas ou permitir arrastar uma classificação calculada. Uma partida excluída deixa de participar desse cálculo.
 - Correção de preservação: `saveRoster` atualiza apenas a fatia de jogadores em `volley-v1`, mantendo partidas e demais campos.
