@@ -269,3 +269,40 @@ for (const theme of ['light', 'dark'] as const) {
     await audit(page);
   });
 }
+
+test('laterais e extremos do Chip alternam e persistem sem reset do app', async ({ page }) => {
+  await seed(page, 'light');
+  await page.getByTestId('home-montar-time').click();
+  const chip = page
+    .locator('[data-chip]')
+    .filter({ has: page.getByRole('button', { name: 'Sabrina', exact: true }) });
+  const button = chip.getByRole('button');
+  const box = await chip.boundingBox();
+  if (!box) throw new Error('Chip não renderizado');
+  const positions = [
+    { x: 5, y: box.height / 2 },
+    { x: box.width - 5, y: box.height / 2 },
+    { x: box.width / 2, y: 3 },
+    { x: box.width / 2, y: box.height - 3 },
+  ];
+  for (const [index, position] of positions.entries()) {
+    await chip.click({ position });
+    const selected = index % 2 === 0;
+    await expect(button).toHaveAttribute('aria-pressed', String(selected));
+    expect(
+      await page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('volley-v1')!).players.find(
+            (player: { name: string }) => player.name === 'Sabrina'
+          ).present
+      )
+    ).toBe(selected);
+  }
+  await expect(button).toHaveCSS('-webkit-tap-highlight-color', 'rgba(0, 0, 0, 0)');
+  await page.reload();
+  await page.getByTestId('home-montar-time').click();
+  await expect(page.getByRole('button', { name: 'Sabrina', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  );
+});

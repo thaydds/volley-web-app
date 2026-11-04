@@ -46,3 +46,7 @@ O guia de presença e movimento é o node `2130:14057`. Dark troca os valores da
 ## Fora desta migração
 
 Sem backend, sincronização entre aparelhos, cadastro de placar ou fluxo de Cartas. Não foram inventados componentes na biblioteca nem novos tokens. Dados existentes usam a mesma origem/chave. A publicação do app depende do merge em main e do workflow de deploy.
+
+## Atualização do Chip (0.4.2)
+
+O app consome `@beachsports/components@0.4.2`, que inclui a área clicável das laterais/topo/base na seleção do Chip e desativa o destaque nativo de toque internamente. O reset global temporário de toque foi removido do app. A proteção contra foco duplicado continua na camada do app, limitada aos controles nativos que ele possui.
