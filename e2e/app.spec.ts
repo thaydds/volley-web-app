@@ -226,3 +226,46 @@ test('toque no Chip alterna presença sem iniciar arraste', async ({ page }, tes
   await player.tap();
   await expect(player).toHaveAttribute('aria-pressed', 'false');
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: foco do Input e do Chip pertence ao contêiner inteiro`, async ({
+    page,
+  }, info) => {
+    await seed(page, theme);
+    await page.getByTestId('home-montar-time').click();
+    await page.getByText('Adicionar jogador', { exact: true }).click();
+    const input = page.getByRole('textbox', { name: 'Nome do jogador' });
+    await input.fill('Teste');
+    await expect(input).toHaveCSS('outline-style', 'none');
+    await expect(page.locator('[data-input]')).toHaveCSS('outline-width', '2px');
+    await page.screenshot({ path: info.outputPath(`input-focus-${theme}.png`) });
+    const chip = page
+      .locator('[data-chip]')
+      .filter({ has: page.getByRole('button', { name: 'Sabrina', exact: true }) });
+    const button = chip.getByRole('button', { name: 'Sabrina', exact: true });
+    await button.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(chip).toHaveCSS('outline-width', '2px');
+    await expect(button).toHaveCSS('outline-style', 'none');
+    await expect(button).toHaveCSS('-webkit-tap-highlight-color', 'rgba(0, 0, 0, 0)');
+    await page.keyboard.press('Space');
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    const actionColor = await chip.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue('--ds-color-action-default').trim()
+    );
+    await expect(chip).toHaveCSS(
+      'background-color',
+      await chip.evaluate((node, color) => {
+        const probe = document.createElement('span');
+        probe.style.color = color;
+        node.append(probe);
+        const result = getComputedStyle(probe).color;
+        probe.remove();
+        return result;
+      }, actionColor)
+    );
+    await page.screenshot({ path: info.outputPath(`chip-focus-${theme}.png`) });
+    await audit(page);
+  });
+}

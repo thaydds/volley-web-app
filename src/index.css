@@ -26,6 +26,7 @@ summary {
 }
 button {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 button:disabled {
   cursor: not-allowed;
@@ -39,7 +40,9 @@ html[data-font-size='extra-large'] {
 a {
   color: var(--ds-color-action-default);
 }
-:focus-visible {
+/* DS components own their focus rings; only app-native controls need this fallback. */
+a:focus-visible,
+summary:focus-visible {
   outline: var(--ds-focus-width) solid var(--ds-color-focus-ring);
   outline-offset: var(--ds-focus-offset);
 }
