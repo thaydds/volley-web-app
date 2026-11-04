@@ -1,6 +1,6 @@
 # Beach Sports · Volley Web App
 
-PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publicados **@beachsports/components 0.4.1** e **@beachsports/tokens 0.1.0**.
+PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publicados **@beachsports/components 0.4.2** e **@beachsports/tokens 0.1.0**.
 
 [Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [Biblioteca e documentação](https://thaydds.github.io/Beach-Sports-DS/) · [App publicado](https://thaydds.github.io/volley-web-app/)
 
