@@ -1,29 +1,23 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { BackButton } from '../components/BackButton';
+import { useState, type FormEvent } from 'react';
+import { Badge, Button, Chip, FormField, Typography } from '@beachsports/components';
+import { Screen } from '../components/Screen';
 import { addPlayer, presentPlayers, togglePresence } from './roster';
 import type { Player } from './types';
-import './RosterScreen.css';
-
 interface PlayerChipProps {
   player: Player;
   onToggle: (name: string) => void;
 }
-
 export function PlayerChip({ player, onToggle }: PlayerChipProps) {
   return (
-    <button
-      type="button"
-      className={player.present ? 'player-chip player-chip--present' : 'player-chip'}
-      aria-pressed={player.present}
+    <Chip
+      label={player.name}
+      size="md"
+      selected={player.present}
+      onSelectedChange={() => onToggle(player.name)}
       data-testid="roster-player-chip"
-      onClick={() => onToggle(player.name)}
-    >
-      <span className="player-chip__name">{player.name}</span>
-    </button>
+    />
   );
 }
-
 interface RosterScreenProps {
   players: Player[];
   notice: string | null;
@@ -31,7 +25,6 @@ interface RosterScreenProps {
   onDraw: () => void;
   onBack: () => void;
 }
-
 export function RosterScreen({
   players,
   notice,
@@ -40,24 +33,18 @@ export function RosterScreen({
   onBack,
 }: RosterScreenProps) {
   const [draft, setDraft] = useState('');
+  const [registrationOpen, setRegistrationOpen] = useState(players.length === 0);
   const [error, setError] = useState<string | null>(null);
   const presentCount = presentPlayers(players).length;
-  const canDraw = presentCount >= 2;
-
-  function handleBlur(): void {
-    if (draft.trim().length === 0) {
+  function handleBlur() {
+    if (!draft.trim()) {
       setError(null);
       return;
     }
     const result = addPlayer(players, draft);
-    if (!result.ok) {
-      setError(result.error);
-    } else {
-      setError(null);
-    }
+    setError(result.ok ? null : result.error);
   }
-
-  function handleSubmit(event: FormEvent): void {
+  function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const result = addPlayer(players, draft);
     if (!result.ok) {
@@ -68,81 +55,98 @@ export function RosterScreen({
     setDraft('');
     setError(null);
   }
-
-  function handleToggle(name: string): void {
-    onPlayersChange(togglePresence(players, name));
-  }
-
   return (
-    <div className="roster-screen">
-      <BackButton onClick={onBack} label="Voltar" testId="roster-back-button" />
-      <h1 className="roster-screen__title">Quem veio hoje?</h1>
-
+    <Screen
+      title="Quem veio hoje?"
+      description="Toque nos jogadores para marcar quem está presente."
+      badge="Nova partida"
+      onBack={onBack}
+      backTestId="roster-back-button"
+      footer={
+        <>
+          {presentCount < 2 && (
+            <Typography variant="text-s" tone="secondary" data-testid="roster-draw-hint">
+              Marque pelo menos 2 presentes para sortear.
+            </Typography>
+          )}
+          <Button
+            size="lg"
+            className="full-width"
+            disabled={presentCount < 2}
+            data-testid="roster-draw-button"
+            onClick={onDraw}
+          >
+            Sortear
+          </Button>
+        </>
+      }
+    >
       {notice && (
-        <p className="roster-screen__notice" role="status" data-testid="roster-notice">
+        <Typography role="status" data-testid="roster-notice">
           {notice}
-        </p>
+        </Typography>
       )}
-
-      <form className="roster-form" onSubmit={handleSubmit} noValidate>
-        <label className="roster-form__label" htmlFor="roster-name">
-          Nome do jogador
-        </label>
-        <div className="roster-form__row">
-          <input
-            id="roster-name"
-            className="roster-form__input"
-            type="text"
-            value={draft}
-            maxLength={30}
-            autoFocus
-            placeholder="Ex.: Lana"
-            data-testid="roster-name-input"
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={handleBlur}
-          />
-          <button type="submit" className="roster-form__add" data-testid="roster-add-button">
-            Adicionar
-          </button>
-        </div>
-        {error && (
-          <p className="roster-form__error" role="alert" data-testid="roster-error">
-            {error}
-          </p>
-        )}
-      </form>
-
-      {players.length === 0 ? (
-        <p className="roster-screen__empty" data-testid="roster-empty">
-          Cadastre o primeiro jogador para começar.
-        </p>
-      ) : (
-        <ul className="roster-list" data-testid="roster-list">
-          {players.map((p) => (
-            <li key={p.name}>
-              <PlayerChip player={p} onToggle={handleToggle} />
+      <div role="status" data-testid="roster-present-count">
+        <Badge
+          tone="info"
+          label={`${presentCount} presente${presentCount === 1 ? '' : 's'} · ${players.length - presentCount} não marcados`}
+        />
+      </div>
+      {players.length ? (
+        <ul className="chip-list" data-testid="roster-list">
+          {players.map((player) => (
+            <li key={player.name}>
+              <PlayerChip
+                player={player}
+                onToggle={(name) => onPlayersChange(togglePresence(players, name))}
+              />
             </li>
           ))}
         </ul>
+      ) : (
+        <Typography data-testid="roster-empty">
+          Cadastre o primeiro jogador para começar.
+        </Typography>
       )}
-
-      <p className="roster-screen__count" data-testid="roster-present-count">
-        {presentCount} presente{presentCount === 1 ? '' : 's'}
-      </p>
-      {!canDraw && (
-        <p className="roster-screen__hint" data-testid="roster-draw-hint">
-          Marque pelo menos 2 presentes para sortear.
-        </p>
-      )}
-      <button
-        type="button"
-        className="roster-screen__draw"
-        disabled={!canDraw}
-        data-testid="roster-draw-button"
-        onClick={onDraw}
+      <Typography variant="text-s" tone="secondary">
+        Preenchido: presente · Contorno: não marcado. Toque para alternar.
+      </Typography>
+      <details
+        className="add-player"
+        open={registrationOpen}
+        onToggle={(event) => setRegistrationOpen(event.currentTarget.open)}
       >
-        Sortear
-      </button>
-    </div>
+        <summary>Adicionar jogador</summary>
+        <form className="stack" onSubmit={handleSubmit} noValidate>
+          <FormField
+            label="Nome do jogador"
+            id="roster-name"
+            type="text"
+            value={draft}
+            maxLength={30}
+            placeholder="Ex.: Lana"
+            data-testid="roster-name-input"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={handleBlur}
+            {...(error
+              ? { validation: 'error' as const, errorMessage: error }
+              : { validation: 'none' as const })}
+          />
+          {error && (
+            <Typography
+              className="visually-hidden"
+              variant="text-s"
+              role="alert"
+              data-testid="roster-error"
+            >
+              {error}
+            </Typography>
+          )}
+          <Button variant="secondary" type="submit" data-testid="roster-add-button">
+            Adicionar
+          </Button>
+        </form>
+      </details>
+    </Screen>
   );
 }

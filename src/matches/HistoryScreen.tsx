@@ -1,124 +1,108 @@
 import { useState } from 'react';
-import { BackButton } from '../components/BackButton';
+import { Badge, Button, Card, Typography } from '@beachsports/components';
+import { Screen } from '../components/Screen';
 import { DeleteModal } from './DeleteModal';
+import { MatchSummary } from './MatchSummary';
 import { formatMatchNumber } from './matches';
 import type { Match } from './types';
-import './HistoryScreen.css';
-
 interface HistoryScreenProps {
   matches: Match[];
   onDelete: (number: number) => void;
   onRematch: (match: Match) => void;
   onBack: () => void;
 }
-
 export function HistoryScreen({ matches, onDelete, onRematch, onBack }: HistoryScreenProps) {
   const [openNumber, setOpenNumber] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Match | null>(null);
-
-  if (matches.length === 0) {
+  const selected = matches.find((m) => m.number === openNumber);
+  if (selected)
     return (
-      <div className="history-screen">
-        <BackButton onClick={onBack} label="Voltar" testId="matches-history-back-button" />
-        <h1 className="history-screen__title">Histórico</h1>
-        <p className="history-screen__empty" data-testid="matches-history-empty">
-          Nenhuma partida registrada ainda.
-        </p>
-      </div>
+      <Screen
+        title="Detalhes da partida"
+        badge={`Partida ${formatMatchNumber(selected.number)}`}
+        onBack={() => setOpenNumber(null)}
+        footer={
+          <>
+            <Button
+              size="lg"
+              className="full-width"
+              data-testid={`matches-rematch-${selected.number}`}
+              onClick={() => onRematch(selected)}
+            >
+              Revanche
+            </Button>
+            <Button
+              variant="destructive"
+              className="full-width"
+              data-testid={`matches-delete-open-${selected.number}`}
+              aria-label={`Excluir partida ${formatMatchNumber(selected.number)}`}
+              onClick={() => setPendingDelete(selected)}
+            >
+              Excluir partida
+            </Button>
+          </>
+        }
+      >
+        <div data-testid={`matches-card-open-${selected.number}`}>
+          <MatchSummary match={selected} />
+        </div>
+        {pendingDelete && (
+          <DeleteModal
+            match={pendingDelete}
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={() => {
+              onDelete(pendingDelete.number);
+              setPendingDelete(null);
+              setOpenNumber(null);
+            }}
+          />
+        )}
+      </Screen>
     );
-  }
-
   return (
-    <div className="history-screen">
-      <BackButton onClick={onBack} label="Voltar" testId="matches-history-back-button" />
-      <h1 className="history-screen__title">Histórico</h1>
-      <ul className="history-screen__list" data-testid="matches-history-list">
-        {matches.map((match) => {
-          const isOpen = openNumber === match.number;
-          return (
-            <li key={match.number} className="history-screen__item">
-              <button
-                type="button"
-                className="match-card"
-                data-testid={`matches-card-${match.number}`}
-                aria-expanded={isOpen}
-                onClick={() => setOpenNumber(isOpen ? null : match.number)}
+    <Screen
+      title="Histórico de partidas"
+      description="Resultados e jogadores de cada encontro."
+      badge="Partidas"
+      onBack={onBack}
+      backTestId="matches-history-back-button"
+    >
+      {!matches.length ? (
+        <Typography data-testid="matches-history-empty">
+          Nenhuma partida registrada ainda.
+        </Typography>
+      ) : (
+        <ul className="stack plain-list" data-testid="matches-history-list">
+          {[...matches].reverse().map((match) => (
+            <li key={match.number}>
+              <Card
+                title={`Partida ${formatMatchNumber(match.number)}`}
+                description={match.date || 'Data não informada'}
+                footer={
+                  <Button
+                    className="full-width"
+                    variant="ghost"
+                    size="sm"
+                    data-testid={`matches-card-${match.number}`}
+                    onClick={() => setOpenNumber(match.number)}
+                  >
+                    Ver partida {formatMatchNumber(match.number)}
+                  </Button>
+                }
               >
-                <span className="match-card__number">{formatMatchNumber(match.number)}</span>
-                <span className="match-card__date">{match.date}</span>
-                {match.winner === null ? (
-                  <span
-                    className="match-card__badge"
-                    data-testid={`matches-winner-badge-${match.number}`}
-                  >
-                    Sem vencedor
-                  </span>
-                ) : (
-                  <span
-                    className="match-card__badge match-card__badge--winner"
-                    data-testid={`matches-winner-badge-${match.number}`}
-                  >
-                    Venceu Time {match.winner}
-                  </span>
-                )}
-              </button>
-              {isOpen && (
-                <div className="match-card__open" data-testid={`matches-card-open-${match.number}`}>
-                  <p className="match-card__open-date">{match.date}</p>
-                  <div className="match-card__open-teams">
-                    <div>
-                      <h3>Time A</h3>
-                      <ul>
-                        {match.teamA.map((name) => (
-                          <li key={name}>{name}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <h3>Time B</h3>
-                      <ul>
-                        {match.teamB.map((name) => (
-                          <li key={name}>{name}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="match-card__open-actions">
-                    <button
-                      type="button"
-                      className="match-card__rematch"
-                      data-testid={`matches-rematch-${match.number}`}
-                      onClick={() => onRematch(match)}
-                    >
-                      Revanche
-                    </button>
-                    <button
-                      type="button"
-                      className="match-card__delete"
-                      data-testid={`matches-delete-open-${match.number}`}
-                      aria-label={`Excluir partida ${formatMatchNumber(match.number)}`}
-                      onClick={() => setPendingDelete(match)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              )}
+                <Badge
+                  data-testid={`matches-winner-badge-${match.number}`}
+                  label={match.winner ? `Time ${match.winner} · Vencedor` : 'Sem vencedor'}
+                  tone={match.winner ? 'success' : 'neutral'}
+                />
+                <Typography tone="secondary">
+                  {(match.winner === 'B' ? match.teamB : match.teamA).join(', ')}
+                </Typography>
+              </Card>
             </li>
-          );
-        })}
-      </ul>
-      {pendingDelete !== null && (
-        <DeleteModal
-          match={pendingDelete}
-          onConfirm={() => {
-            onDelete(pendingDelete.number);
-            setPendingDelete(null);
-            setOpenNumber(null);
-          }}
-          onCancel={() => setPendingDelete(null)}
-        />
+          ))}
+        </ul>
       )}
-    </div>
+    </Screen>
   );
 }

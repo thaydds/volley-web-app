@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     coverage: {
@@ -17,6 +18,7 @@ export default defineConfig({
         'src/home/**/*.{ts,tsx}',
         'src/matches/**/*.{ts,tsx}',
         'src/components/**/*.{ts,tsx}',
+        'src/settings/**/*.{ts,tsx}',
         '!**/types.ts',
         '!src/home/navigation.ts',
       ],

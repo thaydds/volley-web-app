@@ -1,50 +1,46 @@
+import { useRef } from 'react';
+import { Button, Typography } from '@beachsports/components';
+import { Modal } from '../components/Modal';
+import { formatMatchNumber } from './matches';
 import type { Match } from './types';
-import './DeleteModal.css';
-
 interface DeleteModalProps {
   match: Match;
   onConfirm: () => void;
   onCancel: () => void;
 }
-
-function pad(number: number): string {
-  return `#${String(number).padStart(3, '0')}`;
-}
-
 export function DeleteModal({ match, onConfirm, onCancel }: DeleteModalProps) {
+  const cancelButton = useRef<HTMLButtonElement>(null);
   return (
-    <div className="delete-modal__backdrop">
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-label={`Excluir partida ${pad(match.number)}`}
-        className="delete-modal"
-        data-testid="matches-delete-modal"
+    <Modal
+      initialFocus={cancelButton}
+      label={`Excluir partida ${formatMatchNumber(match.number)}`}
+      testId="matches-delete-modal"
+      onCancel={onCancel}
+      alert
+    >
+      <Typography as="h2" variant="heading-l">
+        Excluir a partida {formatMatchNumber(match.number)} de {match.date}?
+      </Typography>
+      <Typography tone="secondary">
+        A partida será removida deste aparelho. Esta ação não pode ser desfeita.
+      </Typography>
+      <Button
+        variant="destructive"
+        className="full-width"
+        data-testid="matches-delete-confirm-button"
+        onClick={onConfirm}
       >
-        <h2 className="delete-modal__title">
-          Excluir a partida {pad(match.number)} de {match.date}?
-        </h2>
-        <p className="delete-modal__hint">Os pontos já somados permanecem no ranking.</p>
-        <div className="delete-modal__actions">
-          <button
-            type="button"
-            className="delete-modal__confirm"
-            data-testid="matches-delete-confirm-button"
-            onClick={onConfirm}
-          >
-            Excluir
-          </button>
-          <button
-            type="button"
-            className="delete-modal__cancel"
-            data-testid="matches-delete-cancel-button"
-            autoFocus
-            onClick={onCancel}
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
+        Excluir
+      </Button>
+      <Button
+        variant="secondary"
+        className="full-width"
+        ref={cancelButton}
+        data-testid="matches-delete-cancel-button"
+        onClick={onCancel}
+      >
+        Cancelar
+      </Button>
+    </Modal>
   );
 }

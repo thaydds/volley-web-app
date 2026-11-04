@@ -32,7 +32,8 @@ describe('RosterScreen — comportamento (US1.2)', () => {
   it('elenco vazio mostra orientação de primeiro cadastro', () => {
     renderRoster();
     expect(screen.getByTestId('roster-empty')).toHaveTextContent(/primeiro jogador/i);
-    expect(screen.getByTestId('roster-name-input')).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    expect(screen.getByTestId('roster-name-input')).toBeVisible();
   });
 
   it('cadastrar nome válido adiciona o chip na lista', async () => {

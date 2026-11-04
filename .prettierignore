@@ -7,3 +7,6 @@ aidlc
 AGENTS.md
 package-lock.json
 public/manifest.webmanifest
+
+test-results
+playwright-report

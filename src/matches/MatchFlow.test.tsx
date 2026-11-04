@@ -10,7 +10,7 @@ function setOnline(online: boolean): void {
 async function setupDrawnApp(): Promise<ReturnType<typeof userEvent.setup>> {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByTestId('home-matches-button'));
+  await user.click(screen.getByTestId('home-montar-time'));
   await user.type(screen.getByTestId('roster-name-input'), 'Lana');
   await user.click(screen.getByTestId('roster-add-button'));
   await user.type(screen.getByTestId('roster-name-input'), 'Bia');
@@ -30,9 +30,6 @@ describe('u2-matches — fluxos F3/F4/F5 ponta a ponta', () => {
   it('F3+F4: sortear → confirmar → finalizar → escolher Time A → histórico com #001 e selo de vencedor', async () => {
     const user = await setupDrawnApp();
     await user.click(screen.getByTestId('draw-confirm-button'));
-    expect(screen.getByText('Essa é a partida #001')).toBeInTheDocument();
-    expect(screen.getByTestId('matches-confirm-date')).toHaveTextContent(/\d{2}\/\d{2}\/\d{4}/);
-    await user.click(screen.getByTestId('matches-confirm-button'));
     expect(screen.getByTestId('matches-winner-modal')).toBeInTheDocument();
     await user.click(screen.getByTestId('matches-winner-a-button'));
     await user.click(screen.getByTestId('matches-winner-confirm-button'));
@@ -47,7 +44,6 @@ describe('u2-matches — fluxos F3/F4/F5 ponta a ponta', () => {
   it('F4/cancelar: finalizar e cancelar o vencedor mantém a partida sem pontuação', async () => {
     const user = await setupDrawnApp();
     await user.click(screen.getByTestId('draw-confirm-button'));
-    await user.click(screen.getByTestId('matches-confirm-button'));
     await user.click(screen.getByTestId('matches-winner-cancel-button'));
     expect(screen.getByTestId('matches-winner-badge-1')).toHaveTextContent('Sem vencedor');
     const raw = JSON.parse(localStorage.getItem('volley-v1') as string);
@@ -57,7 +53,6 @@ describe('u2-matches — fluxos F3/F4/F5 ponta a ponta', () => {
   it('F5/excluir: cartão → excluir com modal nomeado remove a partida e mantém o próximo número sem reutilizar', async () => {
     const user = await setupDrawnApp();
     await user.click(screen.getByTestId('draw-confirm-button'));
-    await user.click(screen.getByTestId('matches-confirm-button'));
     await user.click(screen.getByTestId('matches-winner-cancel-button'));
     await user.click(screen.getByTestId('matches-card-1'));
     await user.click(screen.getByTestId('matches-delete-open-1'));
@@ -71,7 +66,6 @@ describe('u2-matches — fluxos F3/F4/F5 ponta a ponta', () => {
   it('F5/revanche: mesmos jogadores voltam ao sorteio e a nova confirmação usa número novo', async () => {
     const user = await setupDrawnApp();
     await user.click(screen.getByTestId('draw-confirm-button'));
-    await user.click(screen.getByTestId('matches-confirm-button'));
     await user.click(screen.getByTestId('matches-winner-cancel-button'));
     await user.click(screen.getByTestId('matches-card-1'));
     await user.click(screen.getByTestId('matches-rematch-1'));
@@ -81,13 +75,13 @@ describe('u2-matches — fluxos F3/F4/F5 ponta a ponta', () => {
     expect(teamA + teamB).toContain('Lana');
     expect(teamA + teamB).toContain('Bia');
     await user.click(screen.getByTestId('draw-confirm-button'));
-    expect(screen.getByText('Essa é a partida #002')).toBeInTheDocument();
+    expect(screen.getByTestId('matches-winner-modal')).toBeVisible();
+    expect(JSON.parse(localStorage.getItem('volley-v1') as string).matches.at(-1).number).toBe(2);
   });
 
   it('histórico abre pela Home e lista persiste entre recarregamentos (BR4.3)', async () => {
     const user = await setupDrawnApp();
     await user.click(screen.getByTestId('draw-confirm-button'));
-    await user.click(screen.getByTestId('matches-confirm-button'));
     await user.click(screen.getByTestId('matches-winner-cancel-button'));
     await user.click(screen.getByTestId('matches-history-back-button'));
     expect(

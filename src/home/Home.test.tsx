@@ -15,7 +15,7 @@ describe('US1.1 — Home (cenários BDD)', () => {
   it('AC1.1.1: Partidas leva ao elenco', async () => {
     const user = userEvent.setup();
     const { onMatches } = renderHome();
-    await user.click(screen.getByTestId('home-matches-button'));
+    await user.click(screen.getByTestId('home-montar-time'));
     expect(onMatches).toHaveBeenCalledTimes(1);
   });
 
@@ -26,11 +26,11 @@ describe('US1.1 — Home (cenários BDD)', () => {
     expect(onRanking).toHaveBeenCalledTimes(1);
   });
 
-  it('BR3.1: Home expõe só Partidas e Ranking — sem Cartas/Config', () => {
+  it('Home segue o redesign: montagem, partidas, ranking, ajustes e Cartas indisponível', () => {
     renderHome();
-    expect(screen.queryByText(/^cartas$/i)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cartas' })).toBeDisabled();
     expect(screen.queryByLabelText(/configura/i)).toBeNull();
-    expect(screen.getByTestId('home-matches-button')).toBeInTheDocument();
+    expect(screen.getByTestId('home-montar-time')).toBeInTheDocument();
     expect(screen.getByTestId('home-ranking-button')).toBeInTheDocument();
   });
 

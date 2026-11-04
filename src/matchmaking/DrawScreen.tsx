@@ -1,64 +1,99 @@
-import { DragDropProvider, useDraggable, useDroppable } from '@dnd-kit/react';
-import type { DragEndEvent } from '@dnd-kit/react';
-import { BackButton } from '../components/BackButton';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { DragDropProvider, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/react';
+import { Badge, Button, Card, Chip, Typography } from '@beachsports/components';
+import { Screen } from '../components/Screen';
+import {
+  Accessibility,
+  defaultPreset,
+  PointerSensor,
+  PointerActivationConstraints,
+} from '@dnd-kit/dom';
 import { resolveDroppedSide } from './draw';
 import type { Teams } from '../roster/types';
-import './DrawScreen.css';
+// Keep the DS button's own selection semantics. Keyboard uses the explicit move action.
+const dragPlugins = defaultPreset.plugins.filter((plugin) => plugin !== Accessibility);
+const dragSensors = [
+  PointerSensor.configure({
+    activationConstraints: [new PointerActivationConstraints.Distance({ value: 8 })],
+  }),
+];
 
 interface DrawScreenProps {
   teams: Teams;
   presentCount: number;
-  onMove: (name: string, toSide: 'A' | 'B') => void;
+  onMove: (name: string, side: 'A' | 'B') => void;
   onRedraw: () => void;
   onConfirm: () => void;
   onBack: () => void;
 }
-
-interface TeamMemberChipProps {
+function TeamMember({
+  name,
+  selected,
+  onSelect,
+}: {
   name: string;
-}
-
-function TeamMemberChip({ name }: TeamMemberChipProps) {
-  const { ref, isDragging } = useDraggable({ id: name });
-
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { ref, handleRef, isDragging } = useDraggable({ id: name });
+  const attach = useCallback(
+    (node: HTMLDivElement | null) => {
+      ref(node);
+      handleRef(node?.querySelector('button') ?? null);
+    },
+    [ref, handleRef]
+  );
   return (
     <div
-      ref={ref}
-      className={`player-chip player-chip--team${isDragging ? ' player-chip--dragging' : ''}`}
+      ref={attach}
+      className="draggable-chip"
+      data-dragging={isDragging}
       data-testid="draw-team-member"
       data-player-name={name}
     >
-      <span className="player-chip__name">{name}</span>
+      <Chip label={name} size="md" selected onSelectedChange={onSelect} />
+      {selected && <Badge label="Selecionado para mover" size="sm" tone="info" />}
     </div>
   );
 }
-
-interface TeamPanelProps {
+function TeamPanel({
+  side,
+  members,
+  selected,
+  onSelect,
+}: {
   side: 'A' | 'B';
   members: string[];
-}
-
-function TeamPanel({ side, members }: TeamPanelProps) {
+  selected: string | null;
+  onSelect: (name: string) => void;
+}) {
   const { ref, isDropTarget } = useDroppable({ id: side });
-
   return (
-    <section
+    <div
       ref={ref}
-      className={`team-panel${isDropTarget ? ' team-panel--drop-target' : ''}`}
-      aria-label={`Time ${side}`}
-      data-testid={side === 'A' ? 'draw-team-a' : 'draw-team-b'}
-      data-drop-target={isDropTarget ? 'true' : 'false'}
+      data-drop-target={isDropTarget}
+      className="team-drop"
+      data-testid={`draw-team-${side.toLowerCase()}`}
     >
-      <h2 className="team-panel__title">Time {side}</h2>
-      <div className="team-panel__list">
-        {members.map((name) => (
-          <TeamMemberChip key={name} name={name} />
-        ))}
-      </div>
-    </section>
+      <Card
+        as="section"
+        title={`Time ${side}`}
+        description={`${members.length} jogador${members.length === 1 ? '' : 'es'}`}
+      >
+        <div className="chip-list">
+          {members.map((name) => (
+            <TeamMember
+              key={name}
+              name={name}
+              selected={name === selected}
+              onSelect={() => onSelect(name)}
+            />
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
-
 export function DrawScreen({
   teams,
   presentCount,
@@ -67,50 +102,107 @@ export function DrawScreen({
   onConfirm,
   onBack,
 }: DrawScreenProps) {
-  function handleDragEnd(event: DragEndEvent): void {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const root = useRef<HTMLDivElement>(null);
+  const moved = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (moved.current) {
+      const name = moved.current;
+      root.current?.querySelectorAll<HTMLElement>('[data-player-name]').forEach((el) => {
+        if (el.dataset.playerName === name) el.querySelector('button')?.focus();
+      });
+      moved.current = null;
+    }
+  }, [teams]);
+  function move(name: string, side: 'A' | 'B') {
+    moved.current = name;
+    onMove(name, side);
+    setSelected(null);
+    setAnnouncement(`${name} movido para Time ${side}.`);
+  }
+  function handleDragEnd(event: DragEndEvent) {
     const { source, target } = event.operation;
     if (event.canceled || !source || !target) return;
-
-    const toSide = resolveDroppedSide(teams, String(source.id), String(target.id));
-    if (toSide === null) return;
-
-    onMove(String(source.id), toSide);
+    const side = resolveDroppedSide(teams, String(source.id), String(target.id));
+    if (side) move(String(source.id), side);
   }
-
+  const target = selected ? (teams.A.includes(selected) ? 'B' : 'A') : null;
   return (
-    <div className="draw-screen">
-      <BackButton onClick={onBack} label="Voltar ao elenco" testId="draw-back-button" />
-
-      <h1 className="draw-screen__title">Times sorteados</h1>
-      <p className="draw-screen__count" data-testid="draw-present-count">
-        {presentCount} presente{presentCount === 1 ? '' : 's'} em quadra
-      </p>
-
-      <DragDropProvider onDragEnd={handleDragEnd}>
-        <div className="draw-screen__panels">
-          <TeamPanel side="A" members={teams.A} />
-          <TeamPanel side="B" members={teams.B} />
-        </div>
-      </DragDropProvider>
-
-      <div className="draw-screen__actions">
-        <button
-          type="button"
-          className="draw-screen__confirm"
-          data-testid="draw-confirm-button"
-          onClick={onConfirm}
-        >
-          Confirmar partida
-        </button>
-        <button
-          type="button"
-          className="draw-screen__redraw"
-          data-testid="draw-redraw-button"
-          onClick={onRedraw}
-        >
-          Sortear novamente
-        </button>
-      </div>
+    <div ref={root}>
+      <Screen
+        title="Times definidos"
+        description="Arraste os jogadores entre os times para ajustar a partida."
+        badge="Nova partida"
+        onBack={onBack}
+        backLabel="Voltar ao elenco"
+        backTestId="draw-back-button"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              className="full-width"
+              data-testid="draw-redraw-button"
+              onClick={onRedraw}
+            >
+              Sortear novamente
+            </Button>
+            <Button
+              size="lg"
+              className="full-width"
+              data-testid="draw-confirm-button"
+              disabled={!teams.A.length || !teams.B.length}
+              onClick={onConfirm}
+            >
+              Finalizar partida
+            </Button>
+          </>
+        }
+      >
+        <Typography variant="text-s" tone="secondary" data-testid="draw-present-count">
+          {presentCount} presentes em quadra
+        </Typography>
+        <DragDropProvider sensors={dragSensors} plugins={dragPlugins} onDragEnd={handleDragEnd}>
+          <div className="stack">
+            <TeamPanel
+              side="A"
+              members={teams.A}
+              selected={selected}
+              onSelect={(name) => setSelected(name === selected ? null : name)}
+            />
+            <TeamPanel
+              side="B"
+              members={teams.B}
+              selected={selected}
+              onSelect={(name) => setSelected(name === selected ? null : name)}
+            />
+          </div>
+        </DragDropProvider>
+        <Typography variant="text-s" tone="secondary">
+          Ou toque em um jogador para movê-lo para o outro time.
+        </Typography>
+        {selected && target && (
+          <Card
+            title={selected}
+            footer={
+              <Button
+                className="full-width"
+                variant="secondary"
+                onClick={() => move(selected, target)}
+              >
+                Mover para Time {target}
+              </Button>
+            }
+          >
+            <Button variant="ghost" onClick={() => setSelected(null)}>
+              Cancelar movimento
+            </Button>
+          </Card>
+        )}
+        <Typography role="status" variant="text-s">
+          {announcement}
+        </Typography>
+      </Screen>
     </div>
   );
 }

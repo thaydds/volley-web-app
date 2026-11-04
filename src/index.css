@@ -1,99 +1,48 @@
-:root {
-  --color-primary: #3b82f6;
-  --color-primary-dark: #2563eb;
-  --color-primary-light: #dbeafe;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
-  --color-border: #e2e8f0;
-  --color-chip: #d9d9d9;
-  --color-chip-pressed: #a1e0ff;
-  --color-chip-border: #4c85ff;
-  --color-disabled: #848484;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+@font-face {
+  font-family: Inter;
+  src: url('./assets/InterVariable-latin.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
-
+:root {
+  font-family: Inter, sans-serif;
+  color: var(--ds-color-text-primary);
+  background: var(--ds-color-bg-base);
+  font-synthesis: none;
+  text-size-adjust: 100%;
+}
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
-
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-}
-
 body {
-  font-family: var(--font-sans);
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  line-height: 1.6;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  min-width: 0;
 }
-
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+button,
+input,
+summary {
+  font: inherit;
 }
-
 button {
-  font-family: inherit;
-  font-size: inherit;
   cursor: pointer;
-  border: none;
-  background: none;
 }
-
-/*
- * Player name chip shared by the roster, draw and confirm screens so the
- * confirm step stays visually consistent with the previous one.
- */
-.player-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-chip);
-  border: none;
-  border-radius: 24px;
-  padding: 10px;
-  font-size: 1rem;
-  font-family: inherit;
-  color: #000000;
-  min-height: 44px;
+button:disabled {
+  cursor: not-allowed;
 }
-
-.player-chip__name {
-  font-weight: 400;
+html[data-font-size='large'] {
+  font-size: 125%;
 }
-
+html[data-font-size='extra-large'] {
+  font-size: 150%;
+}
 a {
-  color: var(--color-primary);
-  text-decoration: none;
+  color: var(--ds-color-action-default);
 }
-
-a:hover {
-  text-decoration: underline;
+:focus-visible {
+  outline: var(--ds-focus-width) solid var(--ds-color-focus-ring);
+  outline-offset: var(--ds-focus-offset);
+}
+h1:focus {
+  outline: none;
 }
