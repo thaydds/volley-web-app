@@ -33,7 +33,6 @@ export function RosterScreen({
   onBack,
 }: RosterScreenProps) {
   const [draft, setDraft] = useState('');
-  const [registrationOpen, setRegistrationOpen] = useState(players.length === 0);
   const [error, setError] = useState<string | null>(null);
   const presentCount = presentPlayers(players).length;
   function handleBlur() {
@@ -111,42 +110,35 @@ export function RosterScreen({
       <Typography variant="text-s" tone="secondary">
         Preenchido: presente · Contorno: não marcado. Toque para alternar.
       </Typography>
-      <details
-        className="add-player"
-        open={registrationOpen}
-        onToggle={(event) => setRegistrationOpen(event.currentTarget.open)}
-      >
-        <summary>Adicionar jogador</summary>
-        <form className="stack" onSubmit={handleSubmit} noValidate>
-          <FormField
-            label="Nome do jogador"
-            id="roster-name"
-            type="text"
-            value={draft}
-            maxLength={30}
-            placeholder="Ex.: Lana"
-            data-testid="roster-name-input"
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={handleBlur}
-            {...(error
-              ? { validation: 'error' as const, errorMessage: error }
-              : { validation: 'none' as const })}
-          />
-          {error && (
-            <Typography
-              className="visually-hidden"
-              variant="text-s"
-              role="alert"
-              data-testid="roster-error"
-            >
-              {error}
-            </Typography>
-          )}
-          <Button variant="secondary" type="submit" data-testid="roster-add-button">
-            Adicionar
-          </Button>
-        </form>
-      </details>
+      <form className="stack" onSubmit={handleSubmit} noValidate>
+        <FormField
+          label="Nome do jogador"
+          id="roster-name"
+          type="text"
+          value={draft}
+          maxLength={30}
+          placeholder="Ex.: Lana"
+          data-testid="roster-name-input"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleBlur}
+          {...(error
+            ? { validation: 'error' as const, errorMessage: error }
+            : { validation: 'none' as const })}
+        />
+        {error && (
+          <Typography
+            className="visually-hidden"
+            variant="text-s"
+            role="alert"
+            data-testid="roster-error"
+          >
+            {error}
+          </Typography>
+        )}
+        <Button variant="secondary" type="submit" data-testid="roster-add-button">
+          Adicionar
+        </Button>
+      </form>
     </Screen>
   );
 }

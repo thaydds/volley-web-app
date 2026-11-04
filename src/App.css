@@ -85,15 +85,6 @@
   align-items: flex-start;
   gap: var(--ds-space-8);
 }
-.add-player > summary {
-  color: var(--ds-color-text-secondary);
-  cursor: pointer;
-  padding-block: var(--ds-space-12);
-  min-height: var(--ds-size-44);
-}
-.add-player .stack {
-  padding-top: var(--ds-space-16);
-}
 .team-drop {
   border-radius: var(--ds-radius-16);
 }

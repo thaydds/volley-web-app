@@ -7,7 +7,7 @@ PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publ
 ## Fluxo
 
 - **Início:** montar time, partidas, ranking e ajustes. Cartas fica indisponível porque ainda não tem fluxo definido.
-- **Seleção:** Chip MD alterna presença; contador usa os dados reais. Cadastro existente fica em “Adicionar jogador”.
+- **Seleção:** Chip MD alterna presença; contador usa os dados reais. Campo de cadastro sempre visível, sem seção expansível.
 - **Times definidos:** sorteio, novo sorteio e movimentação por arraste. Alternativa por teclado/toque: selecionar jogador → Mover para Time A/B. A mudança é anunciada e o foco volta ao jogador.
 - **Vencedor:** finalizar registra a partida; confirmação escolhe A/B. Cancelar mantém o registro sem vencedor.
 - **Histórico e detalhes:** todas as partidas locais têm detalhe próprio, revanche e exclusão com confirmação. Placar ausente aparece como `—`.

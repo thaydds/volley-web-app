@@ -40,7 +40,7 @@ O guia de presença e movimento é o node `2130:14057`. Dark troca os valores da
 - Falta RadioGroup no DS. A escolha de vencedor usa Button com `aria-pressed`, agrupamento e texto “Selecionado”; só um vencedor fica ativo.
 - Falta Dialog no DS. O app usa `dialog` nativo para modalidade, contenção de foco e Escape, composto com DS. Exclusão começa com foco em Cancelar e retorna ao disparador quando cancelada. Vencedor tem apresentação de tela móvel inteira.
 - Onboarding e fonte eram propostas. Onboarding é acessível por Ajustes → Como usar, sem criar cadastro nem forçar primeira visita. Fonte usa 100%/125%/150%, e o browser continua podendo ampliar mais.
-- Cadastro preexistente foi preservado em uma seção expansível da seleção, pois o produto precisa funcionar com elenco inicialmente vazio.
+- O campo de cadastro fica diretamente na seleção, sempre visível, sem seção expansível nem título adicional.
 - Arraste usa a API do dnd-kit existente. Um deslocamento mínimo de 8 CSS pixels diferencia arrastar de tocar; esse número é configuração de gesto, não token visual. O handle é o botão real do Chip. O app mantém a seleção semântica do DS, oferece alternativa por teclado/toque e anuncia o resultado. Prévia/área de destino são comportamentos locais, sem criar variantes canônicas de DS.
 
 ## Fora desta migração

@@ -233,8 +233,8 @@ for (const theme of ['light', 'dark'] as const) {
   }, info) => {
     await seed(page, theme);
     await page.getByTestId('home-montar-time').click();
-    await page.getByText('Adicionar jogador', { exact: true }).click();
     const input = page.getByRole('textbox', { name: 'Nome do jogador' });
+    await expect(input).toBeVisible();
     await input.fill('Teste');
     await expect(input).toHaveCSS('outline-style', 'none');
     await expect(page.locator('[data-input]')).toHaveCSS('outline-width', '2px');
