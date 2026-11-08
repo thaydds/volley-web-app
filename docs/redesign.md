@@ -50,3 +50,14 @@ Sem backend, sincronização entre aparelhos, cadastro de placar ou fluxo de Car
 ## Atualização do Chip (0.4.2)
 
 O app consome `@beachsports/components@0.4.2`, que inclui a área clicável das laterais/topo/base na seleção do Chip e desativa o destaque nativo de toque internamente. O reset global temporário de toque foi removido do app. A proteção contra foco duplicado continua na camada do app, limitada aos controles nativos que ele possui.
+
+## Atualização dos tokens (0.1.1)
+
+O app consome `@beachsports/tokens@0.1.1`, com nomes, valores e aliases alinhados
+ao export do Figma. Os nomes legados permanecem como aliases de compatibilidade
+e os valores já publicados foram preservados. `@beachsports/components` permanece
+em `0.4.2`, cuja dependência `^0.1.0` aceita a correção `0.1.1`.
+
+A atualização é feita nos pacotes publicados e no lockfile; o app continua
+importando o CSS de tokens uma única vez. O Figma não foi alterado por esta
+atualização e a fidelidade completa de todos os componentes é uma revisão separada.
