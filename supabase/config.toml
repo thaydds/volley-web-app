@@ -1,0 +1,8 @@
+project_id = "volley-web-app"
+
+[functions.volley-api]
+# The handler validates user tokens online itself. Bootstrap uses verified CAPTCHA.
+verify_jwt = false
+
+[auth]
+enable_anonymous_sign_ins = true

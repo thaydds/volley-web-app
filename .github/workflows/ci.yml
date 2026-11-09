@@ -25,6 +25,8 @@ jobs:
         run: npm run typecheck
       - name: Test with coverage
         run: npm run test:coverage
+      - name: Database permissions and API security contracts
+        run: npm run test:backend
       - name: Build production PWA
         run: npm run build
       - name: Install Chromium
