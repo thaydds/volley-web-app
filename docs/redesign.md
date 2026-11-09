@@ -49,15 +49,27 @@ Sem backend, sincronização entre aparelhos, cadastro de placar ou fluxo de Car
 
 ## Atualização do Chip (0.4.2)
 
-O app consome `@beachsports/components@0.4.2`, que inclui a área clicável das laterais/topo/base na seleção do Chip e desativa o destaque nativo de toque internamente. O reset global temporário de toque foi removido do app. A proteção contra foco duplicado continua na camada do app, limitada aos controles nativos que ele possui.
+A atualização para `@beachsports/components@0.4.2` incluiu a área clicável das laterais/topo/base na seleção do Chip e desativou o destaque nativo de toque internamente. O reset global temporário de toque foi removido do app. A proteção contra foco duplicado continua na camada do app, limitada aos controles nativos que ele possui.
 
 ## Atualização dos tokens (0.1.1)
 
 O app consome `@beachsports/tokens@0.1.1`, com nomes, valores e aliases alinhados
 ao export do Figma. Os nomes legados permanecem como aliases de compatibilidade
-e os valores já publicados foram preservados. `@beachsports/components` permanece
-em `0.4.2`, cuja dependência `^0.1.0` aceita a correção `0.1.1`.
+e os valores já publicados foram preservados. Nessa atualização, `@beachsports/components`
+permaneceu em `0.4.2`, cuja dependência `^0.1.0` aceita a correção `0.1.1`.
 
 A atualização é feita nos pacotes publicados e no lockfile; o app continua
 importando o CSS de tokens uma única vez. O Figma não foi alterado por esta
 atualização e a fidelidade completa de todos os componentes é uma revisão separada.
+
+## Atualização dos componentes (0.5.0)
+
+O app consome `@beachsports/components@0.5.0`, mantendo os tokens em `0.1.1`,
+compatíveis com a dependência `^0.1.0` da biblioteca. A versão adiciona `PlayerCard`
+e `MatchCard` e preserva o `Card` composicional utilizado pelas telas atuais.
+
+Esta atualização instala o pacote publicado e atualiza o lockfile. As telas
+continuam usando suas composições atuais; a adoção dos novos cards exige uma
+migração própria. A auditoria do DS registra pendências de contraste nos badges
+Light desses novos cards e de vínculos no Figma; atualizar a dependência não
+resolve essas pendências nem certifica a paridade completa com o design.
