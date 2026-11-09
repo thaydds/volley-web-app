@@ -28,8 +28,10 @@ anônima validada online em cada leitura/gravação. O navegador recebe access t
 e refresh token de sessão, que continuam sendo credenciais sensíveis do usuário.
 O app permanece no GitHub Pages. Nenhuma service_role é usada nem mesmo pela API.
 Esconder uma chave atrás de API pública não elimina abuso nem substitui autorização.
-CAPTCHA Turnstile validado no servidor protege a criação de sessão pelo gateway;
-sem configuração de CAPTCHA, a criação retorna 503. Ver supabase/README.md.
+Decisão posterior do usuário: não usar CAPTCHA na interface. A exigência de
+Turnstile foi removida da API e dos testes; a criação da sessão recebe apenas `{}`.
+Criação/renovação preservam limites do Supabase Auth e mutações continuam limitadas
+por sessão no banco. Nenhum secret adicional é necessário. Ver supabase/README.md.
 
 ## Modelo
 
@@ -90,9 +92,11 @@ todas as partidas ativas no servidor, não só sobre a página exibida no histó
   RLS pode ser ignorado pelo proprietário. RLS isolado não basta nesse desenho.
 - Todos os visitantes com sessão podem executar as operações compartilhadas:
   created_by é auditoria, não uma falsa restrição de propriedade.
-- Limitar operações por sessão e tamanho das requisições; configurar proteção
-  contra abuso de criação de sessões anônimas, com CAPTCHA/Turnstile e limites
-  de Auth. Limite por sessão não impede abuso com múltiplas sessões.
+- Limitar operações por sessão e tamanho das requisições; revisar limites do
+  Supabase Auth para criação/renovação de sessões, sem CAPTCHA. Preservar HTTP 429
+  e reutilizar sessões existentes. Limites não distinguem humanos de robôs;
+  múltiplas sessões continuam sendo um risco. O proxy pode agrupar visitantes
+  pelo IP de saída; não confiar em cabeçalhos de IP enviados pelo navegador.
 - O modelo aberto continua permitindo alterações indesejadas pelos endpoints
   autorizados. Se isso for inaceitável, será necessário restringir quem edita.
 - Renderizar nomes como texto React; sem HTML injetado. Não usar nomes como
@@ -145,4 +149,4 @@ frontend ou importação. O usuário aprovou "Aplicar e validar o banco". As tr�
 migrations foram aplicadas, permissões verificadas e asserções de banco passaram
 com rollback dos registros de teste. Ver supabase/README.md para evidências,
 correções de grants no ambiente gerenciado e os dois avisos intencionais do Advisor.
-Deploy da API, configuração do CAPTCHA e integração do frontend continuam pendentes.
+Deploy e testes HTTP da API, revisão das quotas de Auth e integração do frontend continuam pendentes.

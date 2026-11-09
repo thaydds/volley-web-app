@@ -10,6 +10,5 @@ Deno.serve(
     supabaseUrl: Deno.env.get('SUPABASE_URL') ?? '',
     supabaseKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     allowedOrigin: Deno.env.get('VOLLEY_ALLOWED_ORIGIN') ?? '',
-    turnstileSecret: Deno.env.get('VOLLEY_TURNSTILE_SECRET'),
   })
 );

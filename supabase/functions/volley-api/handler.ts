@@ -2,7 +2,6 @@ export interface ApiConfig {
   supabaseUrl: string;
   supabaseKey: string;
   allowedOrigin: string;
-  turnstileSecret?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -155,35 +154,9 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
       const action = new URL(request.url).pathname.split('/').pop();
       if (action === 'session' || action === 'refresh') {
         if (action === 'session') {
-          // Fail closed until anti-abuse protection is configured. Never trust CORS as authentication.
-          if (!config.turnstileSecret) return reply(503, { error: 'captcha_not_configured' });
-          if (
-            !keys(body, ['captcha_token']) ||
-            typeof body.captcha_token !== 'string' ||
-            body.captcha_token.length > 2048 ||
-            !body.captcha_token
-          )
-            return reply(400, { error: 'captcha_required' });
-          const verification = await http(
-            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-            {
-              method: 'POST',
-              body: new URLSearchParams({
-                secret: config.turnstileSecret,
-                response: body.captcha_token,
-              }),
-              signal: AbortSignal.timeout(10000),
-            }
-          );
-          const captcha: unknown = await verification.json();
-          if (
-            !verification.ok ||
-            !object(captcha) ||
-            captcha.success !== true ||
-            captcha.hostname !== new URL(config.allowedOrigin).hostname ||
-            captcha.action !== 'volley-session'
-          )
-            return reply(403, { error: 'captcha_failed' });
+          if (!keys(body, [])) return reply(400, { error: 'invalid_session_request' });
+          // Supabase Auth enforces signup quotas. Do not trust client-supplied IP headers
+          // or replace this with a per-process counter in a distributed Edge runtime.
         } else if (
           !keys(body, ['refresh_token']) ||
           typeof body.refresh_token !== 'string' ||

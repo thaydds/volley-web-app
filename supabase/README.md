@@ -48,12 +48,12 @@ configuração do frontend; não adicionar `VITE_SUPABASE_*`.
 Todos os endpoints usam POST e JSON. Respostas nunca incluem chave de projeto,
 metadados de usuário, mensagem SQL ou detalhes internos de erro.
 
-| Endpoint   | Corpo                                                                                 | Sessão                           |
-| ---------- | ------------------------------------------------------------------------------------- | -------------------------------- |
-| `/session` | `{ "captcha_token": "..." }`                                                          | Cria sessão anônima após CAPTCHA |
-| `/refresh` | `{ "refresh_token": "..." }`                                                          | Renova sessão existente          |
-| `/read`    | `{ "resource": "players", "limit": 100, "offset": 0 }`                                | Bearer access token              |
-| `/mutate`  | `{ "operation": "create_player", "request_id": "UUID", "input": { "name": "Nome" } }` | Bearer access token              |
+| Endpoint   | Corpo                                                                                 | Sessão                              |
+| ---------- | ------------------------------------------------------------------------------------- | ----------------------------------- |
+| `/session` | `{}`                                                                                  | Cria sessão anônima automaticamente |
+| `/refresh` | `{ "refresh_token": "..." }`                                                          | Renova sessão existente             |
+| `/read`    | `{ "resource": "players", "limit": 100, "offset": 0 }`                                | Bearer access token                 |
+| `/mutate`  | `{ "operation": "create_player", "request_id": "UUID", "input": { "name": "Nome" } }` | Bearer access token                 |
 
 Leituras: `players`, `matches`, `ranking`. Paginação obrigatória, 1–200 registros.
 O cliente deve buscar todas as páginas necessárias. Ranking calculado sobre todas
@@ -64,7 +64,7 @@ Mutações: `create_player`, `rename_player`, `archive_player`, `restore_player`
 Ver os testes para os corpos tipados. Datas ISO `YYYY-MM-DD`; lado A/B; vencedor
 A/B/null. A criação de partida começa sem vencedor, como no fluxo atual.
 
-Erros: 400 entrada inválida, 401 sessão inválida, 403 origem/CAPTCHA, 404 ausente,
+Erros: 400 entrada inválida, 401 sessão inválida, 403 origem, 404 ausente,
 409 conflito, 413 corpo acima de 32 KiB, 429 limite, 502 falha de serviço,
 503 configuração ausente. Tentar novamente não pode gerar outro request_id.
 
@@ -79,19 +79,19 @@ Erros: 400 entrada inválida, 401 sessão inválida, 403 origem/CAPTCHA, 404 aus
    ao histórico remoto para evitar aplicação duplicada pela CLI.
 2. Ativar sessões anônimas no Supabase Auth. Configurar limites de Auth e revisar
    as recomendações de proteção contra abuso do Supabase.
-3. Configurar Cloudflare Turnstile para o hostname do app. O widget deve usar a
-   ação `volley-session`. A site key é pública e não é uma chave de projeto
-   Supabase. O secret permanece exclusivamente no servidor.
-4. Configurar secrets da Edge Function via ferramenta segura:
-   `VOLLEY_ALLOWED_ORIGIN=https://thaydds.github.io` e `VOLLEY_TURNSTILE_SECRET`.
-   Não salvar valores reais em arquivos versionados ou comandos registrados.
-   SUPABASE_URL e SUPABASE_ANON_KEY vêm do runtime Supabase.
+3. Não há CAPTCHA, widget, site key ou secret Turnstile. Confirmar que o Auth não
+   exige desafio e revisar as quotas de criação anônima e renovação antes de ativar.
+   A API preserva HTTP 429 do Auth, sem repetir automaticamente a requisição.
+4. Configurar `VOLLEY_ALLOWED_ORIGIN=https://thaydds.github.io` no servidor.
+   SUPABASE_URL e SUPABASE_ANON_KEY vêm do runtime Supabase; nenhuma chave de
+   projeto vai para o frontend.
 5. Implantar a função com `verify_jwt=false`: o próprio handler valida tokens
    online por `/auth/v1/user` em todas as leituras/mutações; somente criação e
    renovação de sessão têm contratos específicos sem esse access token.
-   A criação falha fechada sem o secret do CAPTCHA.
-6. Validar reais CAPTCHA, criação/renovação de sessão, grants, Data API, respostas
-   sem secrets e dois clientes concorrentes. Revisar o Security Advisor.
+6. Validar criação/renovação automática de sessão, grants, Data API, respostas
+   sem secrets, quotas do Auth e dois clientes concorrentes. Reutilizar a sessão
+   existente ao abrir o app e renová-la quando necessário, evitando criar um
+   usuário novo a cada navegação. Revisar o Security Advisor.
 7. Só depois conectar frontend, importação, cache e estados de falha; validar
    novamente antes de ativar no app publicado.
 
@@ -102,11 +102,19 @@ dados compartilhados, inclusive fora da interface. Não há restrição por dono
 created_by é auditoria, não autorização de propriedade. Se isso for inaceitável,
 é necessário mudar a regra de acesso para membros/organizadores.
 
-CORS limita navegadores, não bots. CAPTCHA protege a criação pelo gateway;
-limite por sessão não protege de múltiplas sessões, ataques distribuídos ou
-cotas de leitura. Antes de ativar, revisar também limites e monitoramento do
-provedor. A chave pública de projeto não é usada como mecanismo de autorização
-nem deve ser tratada como segredo, mesmo mantida no servidor por escolha do usuário.
+CORS limita navegadores, não bots. Por decisão do usuário, o fluxo não usa CAPTCHA.
+Criação e renovação dependem dos limites do Supabase Auth; o banco continua
+limitando mutações por sessão. Limites não distinguem humanos de robôs e não
+protegem integralmente contra sessões múltiplas, leitura abusiva ou ataques
+que consomem a quota para impedir acessos legítimos.
+
+Os limites por IP do Auth podem considerar o IP de saída da Edge Function e
+agrupar visitantes diferentes. Não encaminhamos IP fornecido pelo cliente e não
+acrescentamos chaves administrativas para alterar isso. Antes de ativar, validar
+esse comportamento, capacidade e monitoramento no ambiente real. A configuração
+remota das quotas não foi alterada nem certificada nesta revisão.
+A chave de projeto não é usada como mecanismo de autorização nem tratada como
+segredo, embora permaneça no servidor por escolha do usuário.
 
 Não existe promessa de risco zero. Os avisos iniciais sobre `rls_auto_enable`
 foram resolvidos pela revogação de EXECUTE, preservando o event trigger.
@@ -129,7 +137,7 @@ Em 2026-11-09, após autorização para aplicar e testar a estrutura:
   partidas, participantes, auditoria e receipts foram zero. Sequências de
   identidade podem apresentar intervalos, como é normal após rollback.
 - Testes do banco simulam o contexto JWT verificado; não substituem os testes
-  HTTP reais de GoTrue/PostgREST/Edge/CAPTCHA ou de clientes concorrentes.
+  HTTP reais de GoTrue/PostgREST/Edge ou de clientes concorrentes.
 
 Audit de dependências em 2026-11-09: `npm audit --omit=dev` retornou zero alertas.
 Audit completo retornou 22 (3 low, 15 moderate, 1 high, 3 critical), na cadeia
@@ -150,4 +158,5 @@ Referências:
 - [API keys](https://supabase.com/docs/guides/getting-started/api-keys)
 - [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Sessões anônimas](https://supabase.com/docs/guides/auth/auth-anonymous)
+- [Limites de Auth](https://supabase.com/docs/guides/auth/rate-limits)
 - [Produção](https://supabase.com/docs/guides/deployment/going-into-prod)

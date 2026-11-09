@@ -1,7 +1,7 @@
 project_id = "volley-web-app"
 
 [functions.volley-api]
-# The handler validates user tokens online itself. Bootstrap uses verified CAPTCHA.
+# The handler validates user tokens online itself. Session creation uses Supabase Auth rate limits.
 verify_jwt = false
 
 [auth]

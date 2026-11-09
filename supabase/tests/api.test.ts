@@ -7,7 +7,6 @@ const config: ApiConfig = {
   supabaseUrl: 'https://test.supabase.co',
   supabaseKey: 'server-only-test-key',
   allowedOrigin: origin,
-  turnstileSecret: 'server-only-captcha',
 };
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 function request(action: string, body: unknown, token?: string) {
@@ -27,51 +26,44 @@ describe('keyless browser API', () => {
     const handler = createHandler(config, http);
     expect((await handler(request('read', {}))).status).toBe(401);
     expect(http).not.toHaveBeenCalled();
-    const foreign = request('session', { captcha_token: 'token' });
+    const foreign = request('session', {});
     foreign.headers.set('origin', 'https://evil.example');
     expect((await handler(foreign)).status).toBe(403);
     expect(http).not.toHaveBeenCalled();
   });
-  it('fails closed when captcha is unconfigured, invalid or issued for another site', async () => {
-    expect(
-      (
-        await createHandler({ ...config, turnstileSecret: undefined })(
-          request('session', { captcha_token: 'token' })
-        )
-      ).status
-    ).toBe(503);
-    for (const captcha of [
-      { success: false },
-      { success: true, hostname: 'evil.example', action: 'volley-session' },
-      { success: true, hostname: 'thaydds.github.io', action: 'other' },
-    ]) {
-      const http = vi.fn().mockResolvedValueOnce(response(captcha));
-      expect(
-        (await createHandler(config, http)(request('session', { captcha_token: 'token' }))).status
-      ).toBe(403);
+  it('rejects unexpected session fields without creating an account', async () => {
+    const http = vi.fn();
+    const result = await createHandler(config, http)(request('session', { user_id: id }));
+    expect(result.status).toBe(400);
+    expect(http).not.toHaveBeenCalled();
+  });
+  it('honors Auth signup and refresh rate limits without retrying or exposing details', async () => {
+    for (const [action, body] of [
+      ['session', {}],
+      ['refresh', { refresh_token: 'token' }],
+    ] as const) {
+      const http = vi.fn().mockResolvedValueOnce(response({ message: config.supabaseKey }, 429));
+      const result = await createHandler(config, http)(request(action, body));
+      expect(result.status).toBe(429);
+      expect(await result.json()).toEqual({ error: 'session_unavailable' });
       expect(http).toHaveBeenCalledTimes(1);
     }
   });
   it('returns only session tokens, with no project credentials or user metadata', async () => {
-    const http = vi
-      .fn()
-      .mockResolvedValueOnce(
-        response({ success: true, hostname: 'thaydds.github.io', action: 'volley-session' })
-      )
-      .mockResolvedValueOnce(
-        response({
-          access_token: 'session-token',
-          refresh_token: 'refresh-token',
-          expires_in: 3600,
-          user: { private: 'hidden' },
-          key: config.supabaseKey,
-        })
-      );
-    const result = await createHandler(
-      config,
-      http
-    )(request('session', { captcha_token: 'token' }));
+    const http = vi.fn().mockResolvedValueOnce(
+      response({
+        access_token: 'session-token',
+        refresh_token: 'refresh-token',
+        expires_in: 3600,
+        user: { private: 'hidden' },
+        key: config.supabaseKey,
+      })
+    );
+    const result = await createHandler(config, http)(request('session', {}));
     expect(result.status).toBe(200);
+    expect(http).toHaveBeenCalledTimes(1);
+    expect(http.mock.calls[0][0]).toBe(`${config.supabaseUrl}/auth/v1/signup`);
+    expect(JSON.parse(http.mock.calls[0][1].body)).toEqual({ data: {} });
     expect(await result.json()).toEqual({
       access_token: 'session-token',
       refresh_token: 'refresh-token',
