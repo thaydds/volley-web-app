@@ -25,7 +25,7 @@ function ensure(standings: Standings, name: string): Standing {
  * Partida sem vencedor (nulo) registra os nomes zerados sem pontuar (C3).
  */
 export function computeStandings(matches: Match[]): Standings {
-  const standings: Standings = {};
+  const standings: Standings = Object.create(null) as Standings;
   for (const match of matches) {
     for (const name of [...match.teamA, ...match.teamB]) {
       ensure(standings, name);

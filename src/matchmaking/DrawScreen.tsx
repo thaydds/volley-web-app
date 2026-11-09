@@ -24,6 +24,7 @@ interface DrawScreenProps {
   onMove: (name: string, side: 'A' | 'B') => void;
   onRedraw: () => void;
   onConfirm: () => void;
+  readOnly?: boolean;
   onBack: () => void;
 }
 function TeamMember({
@@ -100,6 +101,7 @@ export function DrawScreen({
   onMove,
   onRedraw,
   onConfirm,
+  readOnly = false,
   onBack,
 }: DrawScreenProps) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export function DrawScreen({
               size="lg"
               className="full-width"
               data-testid="draw-confirm-button"
-              disabled={!teams.A.length || !teams.B.length}
+              disabled={readOnly || !teams.A.length || !teams.B.length}
               onClick={onConfirm}
             >
               Finalizar partida

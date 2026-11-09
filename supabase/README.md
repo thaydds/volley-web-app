@@ -1,162 +1,174 @@
-# Volley API — primeira entrega
+# Volley — banco, API e integração
 
-Esta PR implementa banco e API. As três migrations foram aplicadas ao projeto
-`xejuimptprhvrjohhqyn` com aprovação explícita. A Edge Function não foi publicada.
-Não muda as telas, não importa localStorage e não publica recursos automaticamente.
-A migração de dados, o cache offline e a troca
-dos repositórios do frontend serão a próxima entrega.
+A PR #10 contém a integração completa das telas, migração com prévia e consulta
+offline. Cinco migrations foram aplicadas ao projeto `xejuimptprhvrjohhqyn` e a
+Edge Function `volley-api` foi publicada. O app publicado ainda depende do merge.
 
-## Arquitetura aprovada
+**Bloqueio de ativação confirmado em 2026-11-09:** o endpoint real de criação de
+sessão retorna `anonymous_sign_in_disabled`. Habilitar Anonymous Sign-Ins no
+[Supabase Auth](https://supabase.com/dashboard/project/xejuimptprhvrjohhqyn/auth/providers)
+e revisar as [quotas de Auth](https://supabase.com/dashboard/project/xejuimptprhvrjohhqyn/auth/rate-limits)
+antes de ativar o app. A tentativa de acesso assistido ao painel foi cancelada.
+Não há outra conexão autorizada que permita alterar essa configuração. O
+`enable_anonymous_sign_ins` do config.toml configura o ambiente local, não muda
+automaticamente o projeto remoto.
 
-Navegador → Edge Function `volley-api` → RPCs fechadas → tabelas privadas.
+## Arquitetura e chaves
 
-Nenhuma chave de projeto Supabase vai para o navegador. O servidor usa
-`SUPABASE_ANON_KEY`, fornecida pelo runtime da Edge Function, para autenticar a
-aplicação. **Não usa service_role.** O usuário recebe um access token de sessão
-e um refresh token, que são credenciais pessoais temporárias e exigem proteção.
-Os tokens não devem ir para URLs, logs ou relatórios de erro.
+Navegador → Edge Function → três RPCs fixas → sete tabelas privadas com RLS.
 
-O app pode continuar no GitHub Pages. Somente a URL pública da API será
-configuração do frontend; não adicionar `VITE_SUPABASE_*`.
+O build inclui somente a URL pública da API em `.env.production`. Nenhuma chave
+Supabase vai para o frontend. A função usa SUPABASE_URL e SUPABASE_ANON_KEY do
+runtime, nunca service_role. Em Auth, envia a chave de aplicação também como
+Bearer de fallback, como o SDK oficial; em consultas/gravações, o Bearer é sempre
+o token de sessão recebido do usuário, validado online por `/auth/v1/user`.
 
-## Banco
+O navegador recebe access/refresh tokens temporários, guardados separadamente
+no armazenamento da origem para reutilizar a sessão. São credenciais de usuário
+que exigem proteção contra XSS; não devem ir para URLs, logs ou relatórios. O
+app renderiza nomes como texto, sem HTML injetado. Não existe CAPTCHA, widget,
+site key, secret Turnstile ou tela de login.
 
-- `private.players`, `private.matches`, `private.match_players`: dados do jogo.
-- `private.mutation_receipts`: deduplicação por sessão + UUID de requisição.
-- `private.audit_events`: rastreio de alterações, sem exposição pública.
-- `private.actor_limits`: limite de 60 mutações aceitas por minuto por sessão.
-- Nenhum papel do navegador recebe acesso às tabelas ou sequências.
-- RLS habilitado; o papel sem login `volley_api_owner` recebe somente os
-  privilégios necessários para as duas funções públicas. Não é proprietário
-  das tabelas nem tem BYPASSRLS. As políticas privadas permitem esse papel.
-- RPCs com SQL estático, `search_path` vazio e identidade extraída dos mesmos
-  claims verificados usados por `auth.uid()`. A API valida o JWT online e
-  PostgREST valida o token antes de estabelecer o contexto do banco. Não
-  concedemos acesso ao schema de Auth do provedor ao papel customizado.
-- Idempotência: repetir a mesma requisição retorna o resultado; alterar payload
-  mantendo request_id gera conflito. UUID deve ser preservado ao tentar novamente.
-- Versão esperada obrigatória nas alterações. Conflito exige recarregar e revisar,
-  nunca sobrescrever automaticamente.
-- Partida e participantes gravados na mesma transação; numeração do banco.
-- Exclusão lógica e restauração; o ranking ignora partidas arquivadas, preserva
-  jogadores com histórico e usa IDs mesmo depois de renomear.
-- Importação ainda não disponível; tabela `import_batches` e operação transacional
-  serão adicionadas com a prévia e resolução de duplicatas na próxima entrega.
+## Contrato HTTP
 
-## HTTP
+Todos os endpoints usam POST, JSON e `Cache-Control: no-store`. O servidor limita
+os bytes efetivamente recebidos a 32 KiB e não retorna mensagens SQL, chaves ou
+metadados internos. `verify_jwt=false` é intencional: o próprio handler verifica
+online os tokens de todas as operações protegidas; bootstrap/refresh têm
+contratos específicos.
 
-Todos os endpoints usam POST e JSON. Respostas nunca incluem chave de projeto,
-metadados de usuário, mensagem SQL ou detalhes internos de erro.
+| Endpoint   | Corpo                                                                                      | Autorização                               |
+| ---------- | ------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `/session` | `{}`                                                                                       | Sessão anônima automática; quotas do Auth |
+| `/refresh` | `{ "refresh_token": "..." }`                                                               | Token de renovação                        |
+| `/read`    | `{ "resource": "players", "limit": 200, "offset": 0 }`                                     | Bearer de usuário                         |
+| `/mutate`  | `{ "operation": "create_player", "request_id": "UUID", "input": { "name": "Nome" } }`      | Bearer de usuário                         |
+| `/import`  | `{ "request_id": "UUID", "input": { "source_id": "UUID", "players": [], "matches": [] } }` | Bearer de usuário                         |
 
-| Endpoint   | Corpo                                                                                 | Sessão                              |
-| ---------- | ------------------------------------------------------------------------------------- | ----------------------------------- |
-| `/session` | `{}`                                                                                  | Cria sessão anônima automaticamente |
-| `/refresh` | `{ "refresh_token": "..." }`                                                          | Renova sessão existente             |
-| `/read`    | `{ "resource": "players", "limit": 100, "offset": 0 }`                                | Bearer access token                 |
-| `/mutate`  | `{ "operation": "create_player", "request_id": "UUID", "input": { "name": "Nome" } }` | Bearer access token                 |
+Leituras: players, matches, archived_matches e ranking. Cada página traz uma
+revision. O cliente busca todas as páginas e só substitui o cache depois de
+obter uma revisão consistente em todos os recursos; até três tentativas se a
+base mudar durante a leitura. Erro nunca é convertido em lista vazia.
 
-Leituras: `players`, `matches`, `ranking`. Paginação obrigatória, 1–200 registros.
-O cliente deve buscar todas as páginas necessárias. Ranking calculado sobre todas
-as partidas ativas no servidor antes da paginação.
+Mutações: create_player, rename_player, archive_player, restore_player,
+create_match, set_match_winner, archive_match e restore_match. Campos exatos,
+UUIDs, versões, participantes, tamanhos, datas e valores são validados. SQL
+estático com parâmetros; nomes de tabela ou comandos SQL não são entradas da API.
 
-Mutações: `create_player`, `rename_player`, `archive_player`, `restore_player`,
-`create_match`, `set_match_winner`, `archive_match`, `restore_match`.
-Ver os testes para os corpos tipados. Datas ISO `YYYY-MM-DD`; lado A/B; vencedor
-A/B/null. A criação de partida começa sem vencedor, como no fluxo atual.
+## Dados e concorrência
 
-Erros: 400 entrada inválida, 401 sessão inválida, 403 origem, 404 ausente,
-409 conflito, 413 corpo acima de 32 KiB, 429 limite, 502 falha de serviço,
-503 configuração ausente. Tentar novamente não pode gerar outro request_id.
+- players, matches e match_players: IDs permanentes, números gerados no banco,
+  times, resultados e nomes históricos. Uma vitória vale um ponto; sem vencedor
+  não pontua. Ranking usa UUID, inclusive após renomear ou remover do elenco.
+- mutation_receipts: UUID global de requisição. Reenvio igual retorna a resposta
+  original mesmo após recriar a sessão. Payload diferente com o mesmo UUID é
+  conflito. A versão esperada impede sobrescrever edições concorrentes.
+- audit_events: rastreio interno; não é retornado pela API.
+- actor_limits: 60 mutações aceitas por minuto por sessão; replays não consomem
+  nova gravação. Um lote de importação conta como uma mutação, sem expor um
+  mecanismo público de desativar esse limite.
+- import_records: deduplicação de cada chave legada por aparelho/origem.
+- Escritas são serializadas para ordenar a revisão da base e garantir a coerência
+  das páginas. Partida, participantes, resultado importado e recibos de um lote
+  são transacionais. Conflito ou entrada inválida desfaz o lote inteiro.
+- Remoção é lógica. A interface permite listar removidas e restaurar partidas;
+  uma partida removida sai do ranking e a restauração repõe sua contribuição.
 
-## Configuração antes de qualquer publicação
+Papéis anon/authenticated não acessam tabelas, sequências ou schema privado.
+Somente as três RPCs públicas têm EXECUTE para authenticated. O papel interno
+volley_api_owner não tem login, BYPASSRLS nem CREATE nos schemas. Auxiliares
+privadas não podem ser chamadas por esses papéis. O schema de Auth do provedor
+não foi liberado ao papel customizado; ele usa a mesma extração de claims
+verificados de auth.uid(). PostgREST verifica JWT antes de estabelecer o contexto.
 
-1. Revisar o histórico das três migrations já aplicadas no projeto Supabase.
-   PGlite valida SQL e papéis localmente, mas não reproduz GoTrue, PostgREST,
-   os privilégios específicos da plataforma ou concorrência entre conexões.
-   Não aplicar `db reset` a banco remoto. A migration cria um papel dedicado;
-   As diferenças de grants do ambiente gerenciado foram corrigidas nas migrations
-   subsequentes e verificadas no projeto real. Os timestamps locais correspondem
-   ao histórico remoto para evitar aplicação duplicada pela CLI.
-2. Ativar sessões anônimas no Supabase Auth. Configurar limites de Auth e revisar
-   as recomendações de proteção contra abuso do Supabase.
-3. Não há CAPTCHA, widget, site key ou secret Turnstile. Confirmar que o Auth não
-   exige desafio e revisar as quotas de criação anônima e renovação antes de ativar.
-   A API preserva HTTP 429 do Auth, sem repetir automaticamente a requisição.
-4. Configurar `VOLLEY_ALLOWED_ORIGIN=https://thaydds.github.io` no servidor.
-   SUPABASE_URL e SUPABASE_ANON_KEY vêm do runtime Supabase; nenhuma chave de
-   projeto vai para o frontend.
-5. Implantar a função com `verify_jwt=false`: o próprio handler valida tokens
-   online por `/auth/v1/user` em todas as leituras/mutações; somente criação e
-   renovação de sessão têm contratos específicos sem esse access token.
-6. Validar criação/renovação automática de sessão, grants, Data API, respostas
-   sem secrets, quotas do Auth e dois clientes concorrentes. Reutilizar a sessão
-   existente ao abrir o app e renová-la quando necessário, evitando criar um
-   usuário novo a cada navegação. Revisar o Security Advisor.
-7. Só depois conectar frontend, importação, cache e estados de falha; validar
-   novamente antes de ativar no app publicado.
+O Advisor mantém três ocorrências intencionais de SECURITY DEFINER executável
+por authenticated. [Critério e recomendações](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+A função administrativa rls_auto_enable continua como event trigger e não pode
+ser executada pelos papéis do navegador.
 
-## Limites de segurança conhecidos
+## Telas, cache e envios incertos
 
-O requisito de escrita aberta permite que qualquer visitante com sessão altere
-dados compartilhados, inclusive fora da interface. Não há restrição por dono;
-created_by é auditoria, não autorização de propriedade. Se isso for inaceitável,
-é necessário mudar a regra de acesso para membros/organizadores.
+O app carrega os dados ao abrir, voltar à aba, reconectar ou tocar em Atualizar.
+Ranking, jogadores e histórico usam o servidor. Presença usa IDs e fica somente
+no aparelho; sorteio em andamento, tema e fonte também são locais.
 
-CORS limita navegadores, não bots. Por decisão do usuário, o fluxo não usa CAPTCHA.
-Criação e renovação dependem dos limites do Supabase Auth; o banco continua
-limitando mutações por sessão. Limites não distinguem humanos de robôs e não
-protegem integralmente contra sessões múltiplas, leitura abusiva ou ataques
-que consomem a quota para impedir acessos legítimos.
+O cache é identificado pela URL da API e guarda apenas a última consulta completa,
+com horário visível. Offline permite consulta, bloqueando cadastros/resultados,
+remoções e restaurações. Não há fila de novas gravações offline.
 
-Os limites por IP do Auth podem considerar o IP de saída da Edge Function e
-agrupar visitantes diferentes. Não encaminhamos IP fornecido pelo cliente e não
-acrescentamos chaves administrativas para alterar isso. Antes de ativar, validar
-esse comportamento, capacidade e monitoramento no ambiente real. A configuração
-remota das quotas não foi alterada nem certificada nesta revisão.
-A chave de projeto não é usada como mecanismo de autorização nem tratada como
-segredo, embora permaneça no servidor por escolha do usuário.
+Antes de uma mutação, o cliente persiste seu UUID e payload. Se a resposta se
+perder, conserva o envio pendente inclusive após recarregar, bloqueia novos envios
+incompatíveis e oferece Repetir envio pendente. Não reenvia automaticamente ao
+reconectar. Recibos globais evitam duplicação mesmo se a sessão precisar ser
+recriada. Uma confirmação de gravação não é invalidada por uma falha posterior
+na consulta; a interface distingue atualização pendente de novos envios.
 
-Não existe promessa de risco zero. Os avisos iniciais sobre `rls_auto_enable`
-foram resolvidos pela revogação de EXECUTE, preservando o event trigger.
-O Advisor agora informa duas ocorrências de execução de SECURITY DEFINER pelo
-papel authenticated nas RPCs: acesso intencional, limitado ao contrato descrito,
-que deve ser revisado, não silenciado automaticamente.
-[Critério do Advisor e recomendações](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+Produção sem URL configurada mostra indisponibilidade, sem voltar silenciosamente
+a gravações locais. `LocalApp` fica somente como prévia legada para desenvolvimento
+sem VITE_VOLLEY_API_URL e para os testes unitários já existentes. Para desenvolver
+a integração, configure essa variável com uma API própria de desenvolvimento e
+uma origem explicitamente permitida; não libere origens arbitrárias em produção.
 
-## Verificação no Supabase gerenciado
+## Importação
 
-Em 2026-11-09, após autorização para aplicar e testar a estrutura:
+O `volley-v1` antigo não é sobrescrito ou apagado. Uma prévia mostra jogadores,
+partidas válidas, erros e possíveis duplicatas, com download da cópia original.
+Itens inválidos ficam fora do envio com aviso, sem destruir a fonte original.
 
-- Seis tabelas privadas com RLS, sem acesso de schema para papéis do navegador.
-- Papel de execução sem login, BYPASSRLS ou CREATE no schema público.
-- EXECUTE negado a anon e permitido a authenticated somente nas duas RPCs;
-  execução da função administrativa negada aos dois papéis.
-- Asserções de banco em `tests/remote-checks.sql` passaram: sessão ausente,
-  acesso direto, nomes com SQL, reenvio, versão, ranking, exclusão e restauração.
-- Registros de teste foram desfeitos com ROLLBACK; contagens finais de jogadores,
-  partidas, participantes, auditoria e receipts foram zero. Sequências de
-  identidade podem apresentar intervalos, como é normal após rollback.
-- Testes do banco simulam o contexto JWT verificado; não substituem os testes
-  HTTP reais de GoTrue/PostgREST/Edge ou de clientes concorrentes.
+Possíveis duplicatas consideram data e os dois times, inclusive invertidos e
+partidas removidas. Começam desmarcadas; uma repetição legítima pode ser selecionada
+explicitamente. O banco também verifica uma duplicata surgida em outro aparelho
+entre a prévia e o envio e exige revisão. Não tenta identificar pessoas além da
+regra existente de nomes únicos normalizados; jogadores homônimos exigem revisão.
 
-Audit de dependências em 2026-11-09: `npm audit --omit=dev` retornou zero alertas.
-Audit completo retornou 22 (3 low, 15 moderate, 1 high, 3 critical), na cadeia
-de ferramentas já existente, incluindo Vite/Vitest/tinypool. PGlite não aparece
-nos alertas. Esses problemas exigem atualização separada da toolchain; esta PR
-não certifica o repositório completo nem publica uma API em produção.
+A origem recebe UUID persistente e cada partida mantém uma chave legada estável.
+O número exibido após importar é o número novo do banco. Nomes de jogadores são
+reaproveitados sem distinção de caixa. A seleção é dividida em lotes menores que
+24 KiB, preservando todas as partidas escolhidas. Cada lote é atômico; se houver
+falha depois de um lote concluído, a repetição retoma com deduplicação por origem.
+A cópia completa continua disponível no aparelho mesmo após a conclusão.
 
-## Validação local e CI
+## Limites e verificação antes do merge
 
-`npm run test:backend` executa PostgreSQL em WASM (PGlite) com a migration real,
-papéis e RLS, além dos contratos HTTP com dependências externas simuladas.
-`npm run typecheck` inclui backend; o CI executa a nova suíte junto da atual.
-Nenhum teste precisa de chave, internet ou banco remoto.
-O script SQL de verificação remota é manual e separado da suíte automática.
+O acesso compartilhado continua aberto: qualquer visitante com sessão pode
+alterar os dados pelas operações aprovadas. Não há propriedade por usuário;
+created_by é auditoria. CORS não distingue humanos de robôs. Quotas reduzem
+abuso, mas não eliminam sessões múltiplas ou indisponibilidade por esgotamento.
 
-Referências:
+Auth pode aplicar limites ao IP de saída da Edge Function e agrupar visitantes.
+Não encaminhamos IP fornecido pelo navegador nem adicionamos chaves administrativas
+para mudar esse comportamento. Validar criação, renovação, quotas e acesso por
+dois clientes no Supabase real depois de habilitar Anonymous Sign-Ins.
 
-- [API keys](https://supabase.com/docs/guides/getting-started/api-keys)
-- [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Sessões anônimas](https://supabase.com/docs/guides/auth/auth-anonymous)
-- [Limites de Auth](https://supabase.com/docs/guides/auth/rate-limits)
-- [Produção](https://supabase.com/docs/guides/deployment/going-into-prod)
+A função já responde corretamente sem expor internals quando esse acesso está
+desabilitado. Os testes de banco com contexto JWT simulado passaram no projeto
+real, incluindo importação, rejeição de duplicatas, revisão e permissões. Todos
+os registros de teste foram desfeitos; contagens finais de jogadores, partidas,
+participantes, recibos, importações e auditoria foram zero. Sequências podem ter
+intervalos após rollback.
+
+Os testes de navegador usam o build de produção, o handler real da API e as
+migrations reais em PostgreSQL WASM (PGlite); somente o serviço externo de Auth é
+simulado. Não acessam o banco real nem usam suas chaves. Verificam dois contextos,
+conflitos, restauração, cache offline, falhas e resposta perdida após commit.
+Isso não certifica GoTrue, limites remotos ou concorrência entre conexões reais.
+
+Audit de dependências em 2026-11-09: zero alertas em `npm audit --omit=dev`.
+O audit completo ainda informa 22 alertas anteriores na toolchain, incluindo
+high/critical em Vite/Vitest/tinypool. Não foram introduzidos por esta integração;
+a atualização das ferramentas continua pendente e não há certificação de risco zero.
+
+## Validação
+
+`npm run test:backend`: contratos da API, cliente, migração, SQL e papéis.
+`npm run test:coverage`: regras e interações existentes.
+`npm run test:e2e`: fluxos do app de produção em 393px, 320px e desktop.
+`npm run typecheck`: frontend, backend e suporte de testes.
+`tests/remote-checks.sql`: verificação manual no projeto vazio antes da ativação,
+com rollback; não executar automaticamente em produção.
+
+Referências: [chaves](https://supabase.com/docs/guides/getting-started/api-keys),
+[RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
+[acesso anônimo](https://supabase.com/docs/guides/auth/auth-anonymous),
+[quotas](https://supabase.com/docs/guides/auth/rate-limits),
+[erros de Auth](https://supabase.com/docs/guides/auth/debugging/error-codes).

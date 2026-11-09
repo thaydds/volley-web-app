@@ -143,7 +143,7 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
         headers: {
           apikey: config.supabaseKey,
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token ?? config.supabaseKey}`,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(10000),
@@ -172,6 +172,13 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
               });
         const session: unknown = await auth.json();
         if (
+          !auth.ok &&
+          object(session) &&
+          (session.code === 'anonymous_provider_disabled' ||
+            session.error_code === 'anonymous_provider_disabled')
+        )
+          return reply(503, { error: 'anonymous_sign_in_disabled' });
+        if (
           !auth.ok ||
           !object(session) ||
           typeof session.access_token !== 'string' ||
@@ -185,7 +192,8 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
           expires_in: session.expires_in,
         });
       }
-      if (action !== 'read' && action !== 'mutate') return reply(404, { error: 'not_found' });
+      if (action !== 'read' && action !== 'mutate' && action !== 'import')
+        return reply(404, { error: 'not_found' });
       const authorization = request.headers.get('authorization') ?? '';
       if (!/^Bearer [A-Za-z0-9._-]+$/.test(authorization) || authorization.length > 8192)
         return reply(401, { error: 'session_required' });
@@ -199,7 +207,8 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
       if (action === 'read') {
         if (
           !keys(body, ['resource', 'limit', 'offset']) ||
-          !['players', 'matches', 'ranking'].includes(String(body.resource)) ||
+          typeof body.resource !== 'string' ||
+          !['players', 'matches', 'archived_matches', 'ranking'].includes(body.resource) ||
           !Number.isInteger(body.limit) ||
           Number(body.limit) < 1 ||
           Number(body.limit) > 200 ||
@@ -213,6 +222,22 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
           { p_kind: body.resource, p_limit: body.limit, p_offset: body.offset },
           token
         );
+      } else if (action === 'import') {
+        if (
+          !keys(body, ['request_id', 'input']) ||
+          !uuid(body.request_id) ||
+          !object(body.input) ||
+          !keys(body.input, ['source_id', 'players', 'matches']) ||
+          !uuid(body.input.source_id) ||
+          !Array.isArray(body.input.players) ||
+          !Array.isArray(body.input.matches)
+        )
+          return reply(400, { error: 'invalid_import' });
+        result = await upstream(
+          '/rest/v1/rpc/volley_import',
+          { p_request_id: body.request_id, p_input: body.input },
+          token
+        );
       } else {
         if (!validMutation(body)) return reply(400, { error: 'invalid_mutation' });
         result = await upstream(
@@ -223,6 +248,7 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
       }
       const data: unknown = await result.json();
       if (result.ok) return reply(200, data);
+      if (result.status === 401) return reply(401, { error: 'invalid_session' });
       const code = object(data) ? data.code : undefined;
       if (code === '40001' || code === '23505') return reply(409, { error: 'conflict' });
       if (code === 'P0002') return reply(404, { error: 'not_found' });

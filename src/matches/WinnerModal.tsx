@@ -1,28 +1,46 @@
 import { useState } from 'react';
-import { Button, Card } from '@beachsports/components';
+import { Button, Card, Typography } from '@beachsports/components';
 import { Modal } from '../components/Modal';
 import { Screen } from '../components/Screen';
 import type { WinnerSide } from './types';
 interface WinnerModalProps {
   onPick: (winner: WinnerSide) => void;
   onCancel: () => void;
+  disabled?: boolean;
+  error?: string;
+  busy?: boolean;
 }
-export function WinnerModal({ onPick, onCancel }: WinnerModalProps) {
+export function WinnerModal({
+  onPick,
+  onCancel,
+  disabled = false,
+  busy = false,
+  error,
+}: WinnerModalProps) {
   const [selected, setSelected] = useState<WinnerSide | null>(null);
   return (
-    <Modal label="Vencedor" testId="matches-winner-modal" onCancel={onCancel} fullscreen>
+    <Modal
+      label="Vencedor"
+      testId="matches-winner-modal"
+      onCancel={() => {
+        if (!busy) onCancel();
+      }}
+      fullscreen
+    >
       <Screen
         title="Vencedor"
         description="Selecione o time vencedor antes de confirmar."
         badge="Resultado"
-        onBack={onCancel}
+        onBack={() => {
+          if (!busy) onCancel();
+        }}
         footer={
           <>
             <Button
               size="lg"
               className="full-width"
               data-testid="matches-winner-confirm-button"
-              disabled={selected === null}
+              disabled={disabled || selected === null}
               onClick={() => {
                 if (selected) onPick(selected);
               }}
@@ -34,6 +52,7 @@ export function WinnerModal({ onPick, onCancel }: WinnerModalProps) {
               className="full-width"
               data-testid="matches-winner-cancel-button"
               onClick={onCancel}
+              disabled={busy}
             >
               Cancelar
             </Button>
@@ -57,6 +76,7 @@ export function WinnerModal({ onPick, onCancel }: WinnerModalProps) {
             ))}
           </div>
         </Card>
+        {error && <Typography role="alert">{error}</Typography>}
       </Screen>
     </Modal>
   );

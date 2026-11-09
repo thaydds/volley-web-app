@@ -21,6 +21,18 @@ function request(action: string, body: unknown, token?: string) {
   });
 }
 describe('keyless browser API', () => {
+  it('reports disabled anonymous access without disclosing Auth internals', async () => {
+    for (const field of ['code', 'error_code']) {
+      const http = vi
+        .fn()
+        .mockResolvedValueOnce(
+          response({ [field]: 'anonymous_provider_disabled', message: config.supabaseKey }, 422)
+        );
+      const result = await createHandler(config, http)(request('session', {}));
+      expect(result.status).toBe(503);
+      expect(await result.json()).toEqual({ error: 'anonymous_sign_in_disabled' });
+    }
+  });
   it('requires a session before database calls and rejects foreign origins', async () => {
     const http = vi.fn();
     const handler = createHandler(config, http);
@@ -63,6 +75,7 @@ describe('keyless browser API', () => {
     expect(result.status).toBe(200);
     expect(http).toHaveBeenCalledTimes(1);
     expect(http.mock.calls[0][0]).toBe(`${config.supabaseUrl}/auth/v1/signup`);
+    expect(http.mock.calls[0][1].headers.Authorization).toBe(`Bearer ${config.supabaseKey}`);
     expect(JSON.parse(http.mock.calls[0][1].body)).toEqual({ data: {} });
     expect(await result.json()).toEqual({
       access_token: 'session-token',

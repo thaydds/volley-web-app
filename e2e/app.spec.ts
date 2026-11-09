@@ -1,4 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { backendFor } from './support/backend';
 import AxeBuilder from '@axe-core/playwright';
 
 const names = [
@@ -16,15 +18,14 @@ const names = [
   'Tigrinho',
 ];
 async function seed(page: Page, theme: 'light' | 'dark') {
+  const players = await backendFor(page).seedPlayers(names);
   await page.addInitScript(
-    ({ names, theme }) => {
+    ({ players, theme }) => {
       if (!localStorage.getItem('e2e-seeded')) {
         localStorage.setItem(
-          'volley-v1',
-          JSON.stringify({
-            players: names.map((name, index) => ({ name, present: index < 10 })),
-            matches: [],
-          })
+          'volley-presence-v1:' +
+            encodeURIComponent('https://xejuimptprhvrjohhqyn.supabase.co/functions/v1/volley-api'),
+          JSON.stringify(Object.fromEntries(players.map((p, index) => [p.id, index < 10])))
         );
         localStorage.setItem(
           'volley-preferences-v1',
@@ -33,7 +34,7 @@ async function seed(page: Page, theme: 'light' | 'dark') {
         localStorage.setItem('e2e-seeded', 'true');
       }
     },
-    { names, theme }
+    { players, theme }
   );
   await page.goto('./');
   await page.evaluate(() => document.fonts.ready);
@@ -112,7 +113,14 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'André', exact: true }).click();
     await page.reload();
     expect(
-      await page.evaluate(() => JSON.parse(localStorage.getItem('volley-v1')!).matches)
+      await page.evaluate(
+        () =>
+          JSON.parse(
+            localStorage.getItem(
+              Object.keys(localStorage).find((k) => k.startsWith('volley-cloud-cache-v1:'))!
+            )!
+          ).matches
+      )
     ).toHaveLength(1);
     await page.getByTestId('home-ranking-button').click();
     await expect(page.getByRole('table')).toBeVisible();
@@ -290,11 +298,20 @@ test('laterais e extremos do Chip alternam e persistem sem reset do app', async 
     const selected = index % 2 === 0;
     await expect(button).toHaveAttribute('aria-pressed', String(selected));
     expect(
-      await page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem('volley-v1')!).players.find(
-            (player: { name: string }) => player.name === 'Sabrina'
-          ).present
+      await page.evaluate(() =>
+        (() => {
+          const cache = JSON.parse(
+            localStorage.getItem(
+              Object.keys(localStorage).find((k) => k.startsWith('volley-cloud-cache-v1:'))!
+            )!
+          );
+          const p = cache.players.find((p: { id: string; name: string }) => p.name === 'Sabrina');
+          return JSON.parse(
+            localStorage.getItem(
+              Object.keys(localStorage).find((k) => k.startsWith('volley-presence-v1:'))!
+            )!
+          )[p.id];
+        })()
       )
     ).toBe(selected);
   }

@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["supabase/**/*.ts", "vitest.backend.config.ts"]
+  "include": ["supabase/**/*.ts", "e2e/**/*.ts", "vitest.backend.config.ts"]
 }

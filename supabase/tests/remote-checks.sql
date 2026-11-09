@@ -69,9 +69,16 @@ begin
       jsonb_build_object('player_id',a,'side','A'),jsonb_build_object('player_id',a,'side','B'))));
     raise exception 'duplicate_player_was_allowed';
   exception when invalid_parameter_value then null; end;
+  result:=public.volley_import(gen_random_uuid(),jsonb_build_object('source_id',gen_random_uuid(),'players',jsonb_build_array('__import_A__','__import_B__'),'matches',jsonb_build_array(jsonb_build_object('key','local-1','played_on','2026-11-01','winner','A','team_a',jsonb_build_array('__import_A__'),'team_b',jsonb_build_array('__import_B__')))));
+  if (result->>'matches_added')::integer<>1 then raise exception 'import_failed'; end if;
+  begin
+    perform public.volley_import(gen_random_uuid(),jsonb_build_object('source_id',gen_random_uuid(),'players','[]'::jsonb,'matches',jsonb_build_array(jsonb_build_object('key','other-device','played_on','2026-11-01','winner','A','team_a',jsonb_build_array('__import_A__'),'team_b',jsonb_build_array('__import_B__')))));
+    raise exception 'cross_device_duplicate_allowed';
+  exception when serialization_failure then null; end;
+  if public.volley_read('players')->>'revision' is null then raise exception 'missing_snapshot_revision'; end if;
 end $$;
 reset role;
 rollback;
 select jsonb_build_object('assertions_passed',true,'players',(select count(*) from private.players),
   'matches',(select count(*) from private.matches),'participants',(select count(*) from private.match_players),
-  'audit',(select count(*) from private.audit_events),'receipts',(select count(*) from private.mutation_receipts)) as validation;
+  'audit',(select count(*) from private.audit_events),'receipts',(select count(*) from private.mutation_receipts),'imports',(select count(*) from private.import_records)) as validation;

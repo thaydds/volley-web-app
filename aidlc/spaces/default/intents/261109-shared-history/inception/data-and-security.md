@@ -150,3 +150,21 @@ migrations foram aplicadas, permissões verificadas e asserções de banco passa
 com rollback dos registros de teste. Ver supabase/README.md para evidências,
 correções de grants no ambiente gerenciado e os dois avisos intencionais do Advisor.
 Deploy e testes HTTP da API, revisão das quotas de Auth e integração do frontend continuam pendentes.
+
+## Ampliação aprovada na mesma PR
+
+O usuário pediu "faça tudo nesse MR já". A PR #10 agora inclui a integração das
+telas, sessões automáticas, cache de consulta offline, importação com prévia,
+restauração e testes entre dois navegadores. Cinco migrations foram aplicadas;
+Edge Function publicada. Source IDs e recibos globais evitam repetir uma importação
+ou um envio mesmo após trocar a sessão; conflitos não sobrescrevem o resultado.
+
+O histórico `volley-v1` permanece intacto. O backend também protege contra uma
+possível duplicata criada por outro dispositivo depois da prévia. A decisão de
+importar um jogo semelhante é explícita, não uma heurística de exclusão silenciosa.
+
+Validação real do endpoint: `anonymous_sign_in_disabled`. O acesso assistido ao
+painel foi cancelado; não foi tentado contornar essa autenticação. É necessário
+habilitar Anonymous Sign-Ins e validar duas sessões e quotas reais antes de ativar.
+Os testes de navegador usam o handler e migrations reais, com Auth externo simulado.
+Supabase/README.md registra o contrato final; o desenho anterior acima é histórico.

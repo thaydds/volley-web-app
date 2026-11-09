@@ -9,6 +9,6 @@ Deno.serve(
   createHandler({
     supabaseUrl: Deno.env.get('SUPABASE_URL') ?? '',
     supabaseKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    allowedOrigin: Deno.env.get('VOLLEY_ALLOWED_ORIGIN') ?? '',
+    allowedOrigin: Deno.env.get('VOLLEY_ALLOWED_ORIGIN') ?? 'https://thaydds.github.io',
   })
 );

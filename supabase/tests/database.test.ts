@@ -175,3 +175,125 @@ describe('private storage and fixed RPC contract', () => {
     await db.exec('reset role');
   });
 });
+
+describe('atomic legacy import and consistent cloud reads', () => {
+  const source = crypto.randomUUID();
+  const request = crypto.randomUUID();
+  const payload = {
+    source_id: source,
+    players: ['Import A', 'Import B'],
+    matches: [
+      {
+        key: 'match-1',
+        played_on: '2026-11-01',
+        winner: 'A',
+        team_a: ['Import A'],
+        team_b: ['Import B'],
+      },
+    ],
+  };
+  const importData = async (input: unknown, id = crypto.randomUUID()) =>
+    (
+      await db.query<{ result: Record<string, unknown> }>(
+        'select public.volley_import($1::uuid,$2::jsonb) as result',
+        [id, JSON.stringify(input)]
+      )
+    ).rows[0].result;
+  it('imports once, replays across sessions and deduplicates source records in later batches', async () => {
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [crypto.randomUUID()]);
+    await db.exec('set role authenticated');
+    const result = await importData(payload, request);
+    expect(result).toMatchObject({ players_added: 2, matches_added: 1 });
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [crypto.randomUUID()]);
+    expect(await importData(payload, request)).toEqual(result);
+    expect(await importData(payload)).toMatchObject({
+      players_added: 0,
+      matches_added: 0,
+      matches_skipped: 1,
+    });
+    await expect(importData({ ...payload, players: ['Changed'] }, request)).rejects.toThrow(
+      /request_conflict/
+    );
+    expect((await read('ranking')).find((p) => p.name === 'Import A')?.points).toBe(1);
+  });
+  it('rolls back every record when any match in a batch is invalid', async () => {
+    const before = (await read('players')).length;
+    await expect(
+      importData({
+        source_id: crypto.randomUUID(),
+        players: ['Rollback A', 'Rollback B'],
+        matches: [
+          {
+            key: 'valid',
+            played_on: '2026-11-01',
+            winner: null,
+            team_a: ['Rollback A'],
+            team_b: ['Rollback B'],
+          },
+          {
+            key: 'invalid',
+            played_on: '2026-02-31',
+            winner: null,
+            team_a: ['Rollback A'],
+            team_b: ['Rollback B'],
+          },
+        ],
+      })
+    ).rejects.toThrow();
+    expect((await read('players')).length).toBe(before);
+    expect((await read('matches')).some((m) => JSON.stringify(m).includes('Rollback'))).toBe(false);
+  });
+  it('rejects altered source keys and inaccessible private helpers', async () => {
+    await expect(
+      importData({ ...payload, matches: [{ ...payload.matches[0], winner: 'B' }] })
+    ).rejects.toThrow(/import_record_conflict/);
+    await expect(
+      db.query('select private.consume_write_budget($1::uuid)', [actor])
+    ).rejects.toThrow(/permission denied/);
+  });
+  it('exposes a monotonic revision for full-history pagination and archived results', async () => {
+    const before = (
+      await db.query<{ revision: string }>(
+        "select public.volley_read('players')->>'revision' as revision"
+      )
+    ).rows[0].revision;
+    const id = crypto.randomUUID();
+    const first = await mutation('create_player', { name: 'Global retry' }, id);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [crypto.randomUUID()]);
+    expect(await mutation('create_player', { name: 'Global retry' }, id)).toEqual(first);
+    const after = (
+      await db.query<{ revision: string }>(
+        "select public.volley_read('players')->>'revision' as revision"
+      )
+    ).rows[0].revision;
+    expect(BigInt(after)).toBeGreaterThan(BigInt(before));
+    expect(await read('archived_matches')).toEqual([]);
+    await db.exec('reset role');
+  });
+});
+
+describe('cross-device duplicate review', () => {
+  it('blocks an unreviewed duplicate from another source but permits an explicit override', async () => {
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [crypto.randomUUID()]);
+    await db.exec('set role authenticated');
+    const game = {
+      key: 'duplicate',
+      played_on: '2026-11-01',
+      winner: 'A',
+      team_a: ['Import A'],
+      team_b: ['Import B'],
+    };
+    const input = { source_id: crypto.randomUUID(), players: [], matches: [game] };
+    const send = (value: unknown) =>
+      db.query('select public.volley_import($1::uuid,$2::jsonb)', [
+        crypto.randomUUID(),
+        JSON.stringify(value),
+      ]);
+    await expect(send(input)).rejects.toThrow(/possible_duplicate/);
+    await send({ ...input, matches: [{ ...game, allow_duplicate: true }] });
+    // Repeated games recorded by the same device retain their distinct legacy keys.
+    await send({ ...input, matches: [{ ...game, key: 'local-1', played_on: '2026-11-03' }] });
+    await send({ ...input, matches: [{ ...game, key: 'local-2', played_on: '2026-11-03' }] });
+    await db.exec('reset role');
+  });
+});
