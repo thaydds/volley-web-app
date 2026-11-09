@@ -1,7 +1,8 @@
 # Histórico compartilhado — modelo e contrato de segurança
 
-Status: arquitetura de API no servidor escolhida pelo usuário. Primeira implementação
-em revisão, sem migrations remotas aplicadas ou mudança do app publicado.
+Status: arquitetura de API no servidor escolhida pelo usuário. Implementação em
+revisão na PR #10; migrations aplicadas e verificadas no projeto Supabase após
+aprovação explícita. Edge Function e integração das telas ainda não publicadas.
 Base: origin/main e6420b5. Projeto Supabase: xejuimptprhvrjohhqyn.
 
 ## Escopo acordado
@@ -140,5 +141,8 @@ Não remover a função nem desativar a ativação automática de RLS.
 
 O usuário selecionou "Quero API sem chave no navegador" no checkpoint de arquitetura.
 A primeira entrega implementa banco/API e testes em supabase/, sem integração do
-frontend ou importação. Aprovação da implementação precede aplicação remota e deploy.
-Nenhuma tabela ou permissão remota foi alterada nesta etapa.
+frontend ou importação. O usuário aprovou "Aplicar e validar o banco". As três
+migrations foram aplicadas, permissões verificadas e asserções de banco passaram
+com rollback dos registros de teste. Ver supabase/README.md para evidências,
+correções de grants no ambiente gerenciado e os dois avisos intencionais do Advisor.
+Deploy da API, configuração do CAPTCHA e integração do frontend continuam pendentes.

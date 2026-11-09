@@ -1,7 +1,9 @@
 # Volley API — primeira entrega
 
-Esta PR prepara banco e API. Não muda as telas, não importa localStorage e não
-publica recursos automaticamente. A migração de dados, o cache offline e a troca
+Esta PR implementa banco e API. As três migrations foram aplicadas ao projeto
+`xejuimptprhvrjohhqyn` com aprovação explícita. A Edge Function não foi publicada.
+Não muda as telas, não importa localStorage e não publica recursos automaticamente.
+A migração de dados, o cache offline e a troca
 dos repositórios do frontend serão a próxima entrega.
 
 ## Arquitetura aprovada
@@ -27,7 +29,10 @@ configuração do frontend; não adicionar `VITE_SUPABASE_*`.
 - RLS habilitado; o papel sem login `volley_api_owner` recebe somente os
   privilégios necessários para as duas funções públicas. Não é proprietário
   das tabelas nem tem BYPASSRLS. As políticas privadas permitem esse papel.
-- RPCs com SQL estático, `search_path` vazio e autorização por `auth.uid()`.
+- RPCs com SQL estático, `search_path` vazio e identidade extraída dos mesmos
+  claims verificados usados por `auth.uid()`. A API valida o JWT online e
+  PostgREST valida o token antes de estabelecer o contexto do banco. Não
+  concedemos acesso ao schema de Auth do provedor ao papel customizado.
 - Idempotência: repetir a mesma requisição retorna o resultado; alterar payload
   mantendo request_id gera conflito. UUID deve ser preservado ao tentar novamente.
 - Versão esperada obrigatória nas alterações. Conflito exige recarregar e revisar,
@@ -65,11 +70,13 @@ Erros: 400 entrada inválida, 401 sessão inválida, 403 origem/CAPTCHA, 404 aus
 
 ## Configuração antes de qualquer publicação
 
-1. Revisar e aplicar a migration em ambiente Supabase de teste usando a CLI.
+1. Revisar o histórico das três migrations já aplicadas no projeto Supabase.
    PGlite valida SQL e papéis localmente, mas não reproduz GoTrue, PostgREST,
    os privilégios específicos da plataforma ou concorrência entre conexões.
    Não aplicar `db reset` a banco remoto. A migration cria um papel dedicado;
-   confirmar as permissões de criação/troca de owner no ambiente de teste.
+   As diferenças de grants do ambiente gerenciado foram corrigidas nas migrations
+   subsequentes e verificadas no projeto real. Os timestamps locais correspondem
+   ao histórico remoto para evitar aplicação duplicada pela CLI.
 2. Ativar sessões anônimas no Supabase Auth. Configurar limites de Auth e revisar
    as recomendações de proteção contra abuso do Supabase.
 3. Configurar Cloudflare Turnstile para o hostname do app. O widget deve usar a
@@ -101,10 +108,28 @@ cotas de leitura. Antes de ativar, revisar também limites e monitoramento do
 provedor. A chave pública de projeto não é usada como mecanismo de autorização
 nem deve ser tratada como segredo, mesmo mantida no servidor por escolha do usuário.
 
-Não existe promessa de risco zero. Os dois avisos atuais do Advisor sobre
-`rls_auto_enable` são tratados pela revogação explícita de EXECUTE, preservando
-o event trigger. SECURITY DEFINER intencional nas RPCs deve ser revisado, não
-silenciado automaticamente no Advisor.
+Não existe promessa de risco zero. Os avisos iniciais sobre `rls_auto_enable`
+foram resolvidos pela revogação de EXECUTE, preservando o event trigger.
+O Advisor agora informa duas ocorrências de execução de SECURITY DEFINER pelo
+papel authenticated nas RPCs: acesso intencional, limitado ao contrato descrito,
+que deve ser revisado, não silenciado automaticamente.
+[Critério do Advisor e recomendações](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+
+## Verificação no Supabase gerenciado
+
+Em 2026-11-09, após autorização para aplicar e testar a estrutura:
+
+- Seis tabelas privadas com RLS, sem acesso de schema para papéis do navegador.
+- Papel de execução sem login, BYPASSRLS ou CREATE no schema público.
+- EXECUTE negado a anon e permitido a authenticated somente nas duas RPCs;
+  execução da função administrativa negada aos dois papéis.
+- Asserções de banco em `tests/remote-checks.sql` passaram: sessão ausente,
+  acesso direto, nomes com SQL, reenvio, versão, ranking, exclusão e restauração.
+- Registros de teste foram desfeitos com ROLLBACK; contagens finais de jogadores,
+  partidas, participantes, auditoria e receipts foram zero. Sequências de
+  identidade podem apresentar intervalos, como é normal após rollback.
+- Testes do banco simulam o contexto JWT verificado; não substituem os testes
+  HTTP reais de GoTrue/PostgREST/Edge/CAPTCHA ou de clientes concorrentes.
 
 Audit de dependências em 2026-11-09: `npm audit --omit=dev` retornou zero alertas.
 Audit completo retornou 22 (3 low, 15 moderate, 1 high, 3 critical), na cadeia
@@ -118,6 +143,7 @@ não certifica o repositório completo nem publica uma API em produção.
 papéis e RLS, além dos contratos HTTP com dependências externas simuladas.
 `npm run typecheck` inclui backend; o CI executa a nova suíte junto da atual.
 Nenhum teste precisa de chave, internet ou banco remoto.
+O script SQL de verificação remota é manual e separado da suíte automática.
 
 Referências:
 

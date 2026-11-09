@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let db: PGlite;
@@ -33,12 +33,15 @@ beforeAll(async () => {
     grant usage on schema auth to public;
     create function public.rls_auto_enable() returns event_trigger language plpgsql
       security definer as $$ begin end; $$;`);
-  await db.exec(
-    readFileSync(
-      new URL('../migrations/20261109210000_shared_history.sql', import.meta.url),
-      'utf8'
-    )
-  );
+  for (const name of readdirSync(new URL('../migrations/', import.meta.url)).sort()) {
+    if (name.endsWith('.sql')) {
+      await db.exec('begin');
+      await db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
+      await db.exec('commit');
+    }
+  }
+  // Managed Supabase does not let this custom role access the provider auth schema.
+  await db.exec('revoke usage on schema auth from volley_api_owner, public');
 }, 30000);
 afterAll(async () => {
   await db.close();
@@ -77,6 +80,14 @@ describe('private storage and fixed RPC contract', () => {
     await expect(mutation('create_player', { name: '   ' })).rejects.toThrow();
     await expect(mutation('create_player', { name: 'x'.repeat(31) })).rejects.toThrow();
     await expect(mutation('create_player', { name: '__PROTO__' })).rejects.toThrow(/duplicate key/);
+  });
+  it('reads the verified JSON JWT claims without provider auth-schema privileges', async () => {
+    await db.query("select set_config('request.jwt.claim.sub', '', false)");
+    await db.query("select set_config('request.jwt.claims', $1, false)", [
+      JSON.stringify({ sub: actor }),
+    ]);
+    expect((await read('players')).length).toBe(2);
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [actor]);
   });
   it('deduplicates retries and rejects request reuse with a different payload', async () => {
     const request = crypto.randomUUID();
