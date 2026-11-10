@@ -7,6 +7,7 @@ import { ConflictDialog } from './ConflictDialog';
 import { PresenceScreen } from './PresenceScreen';
 import { PrepTeams } from './PrepTeams';
 import { MatchPanel } from './MatchPanel';
+import { initialScore, type SessionScore } from './sessionScores';
 import { gameTitle } from './gameLabels';
 import { useLifecycle } from './useLifecycle';
 import { usePresenceSelection } from './usePresenceSelection';
@@ -57,6 +58,13 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
   const [gameId, setGameId] = useState(() =>
     location.hash.startsWith('#match=') ? location.hash.slice(7) : ''
   );
+  const [scores, setScores] = useState<Record<string, SessionScore>>({});
+  function changeScore(game: Game, patch: Partial<SessionScore>) {
+    setScores((previous) => ({
+      ...previous,
+      [game.id]: { ...(previous[game.id] ?? initialScore(game)), ...patch },
+    }));
+  }
   const [tab, setTab] = useState<'in_progress' | 'finished'>('in_progress');
   const [archived, setArchived] = useState(false);
   const [preferences, setPreferences] = useState(loadPreferences);
@@ -203,12 +211,6 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
       history.replaceState(null, '', `#match=${id}`);
       go('game');
     }
-  }
-  async function save(game: Game, a: number, b: number) {
-    const result = await sync.run(() =>
-      engine.append('save_score', { id: game.id, version: game.version, score_a: a, score_b: b })
-    );
-    return result.ok;
   }
   async function confirm() {
     if (!dialog || confirming.current) return;
@@ -447,7 +449,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
       )}
       {view === 'pregame' && !state.draft && (
         <Page title="Prepare os times" onBack={() => go('roster')}>
-          <Button onClick={() => go('roster')}>Quem veio hoje?</Button>
+          <Button onClick={() => go('roster')}>Preparar nova partida</Button>
         </Page>
       )}
       {view === 'matches' && (
@@ -496,7 +498,8 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
                     pending={pendingFor(m.id)}
                     disabled={sync.locked || !!m.deleted_at}
                     onOpen={() => openGame(m)}
-                    onSave={(a, b) => save(m, a, b)}
+                    draft={scores[m.id] ?? initialScore(m)}
+                    onDraftChange={(patch) => changeScore(m, patch)}
                   />
                 </li>
               ))}
@@ -513,10 +516,10 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           title={game.status === 'finished' ? 'Partida finalizada' : gameTitle(game)}
           description={
             game.status === 'finished'
-              ? 'Resultado confirmado · não é possível editar.'
+              ? undefined
               : data.archived.some((m) => m.id === game.id)
                 ? 'Histórico arquivado anterior · somente consulta.'
-                : 'Em andamento · participantes definidos no pré-jogo.'
+                : undefined
           }
           badge={gameTitle(game)}
           onBack={() => go('matches')}
@@ -530,7 +533,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
                   Revanche
                 </Button>
                 <Button className={styles.full} variant="secondary" onClick={() => go('roster')}>
-                  Quem veio hoje?
+                  Preparar nova partida
                 </Button>
               </>
             ) : data.archived.some((m) => m.id === game.id) ? null : (
@@ -550,7 +553,8 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
             detail
             footer={gameFooter}
             disabled={sync.locked || !!game.deleted_at}
-            onSave={(a, b) => save(game, a, b)}
+            draft={scores[game.id] ?? initialScore(game)}
+            onDraftChange={(patch) => changeScore(game, patch)}
             onFinish={game.deleted_at ? undefined : (a, b) => modal({ kind: 'finish', game, a, b })}
           />
         </Page>

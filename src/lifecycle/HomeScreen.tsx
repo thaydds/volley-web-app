@@ -101,7 +101,7 @@ export function HomeScreen({
         description="Marque quem veio e prepare os times."
         footer={
           <Button className={styles.full} onClick={onRoster}>
-            Quem veio hoje?
+            Preparar nova partida
           </Button>
         }
       />

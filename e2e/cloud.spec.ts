@@ -19,20 +19,19 @@ test('offline create/start/score/finalize survive reload and sync dependencies w
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   await context.setOffline(true);
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await page.getByLabel('Nome do jogador').fill('Nova pessoa');
   await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Nova pessoa', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Voltar', exact: true }).click();
   await start(page, ['André', 'Lana', 'Nova pessoa']);
   await score(page, '21', '18');
-  await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Salvar placar', exact: true })).toHaveCount(0);
   await finish(page);
   const before = await outbox(page);
   expect(before.queue.map((c) => (c as { operation?: string }).operation)).toEqual([
     'create_player',
     'start_match',
-    'save_score',
     'finish_match',
   ]);
   await page.reload();
@@ -61,7 +60,7 @@ test('lost acknowledgement replays the identical operation after session recreat
   await seed(page, backend);
   await start(page);
   await score(page);
-  await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Salvar placar', exact: true })).toHaveCount(0);
   await finish(page);
   await home(page);
   const requests = (await outbox(page)).queue.map((c) => c.request_id);
@@ -105,14 +104,14 @@ test('two independent devices retain a conflict until explicit review, never ove
         .click();
       await p.getByRole('button', { name: /Abrir Partida/ }).focus();
       await p.keyboard.press('Enter');
-      await expect(p.getByRole('textbox', { name: 'Placar Time A', exact: true })).toBeVisible();
+      await expect(p.getByRole('spinbutton', { name: 'Placar Time A', exact: true })).toBeVisible();
     }
     await score(page, '21', '18');
-    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await finish(page);
     await home(page);
     await synchronized(page);
     await score(second, '25', '19');
-    await second.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await finish(second);
     await home(second);
     await second.getByRole('button', { name: 'Sincronizar', exact: true }).click();
     await expect(second.getByRole('button', { name: 'Revisar conflito' })).toBeVisible();
@@ -141,7 +140,7 @@ test('a failed refresh preserves cached data and a storage failure never acknowl
   backend.failReads = true;
   await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await expect(page.getByRole('button', { name: 'André', exact: true })).toBeVisible();
   await page.evaluate(() => {
     const original = IDBObjectStore.prototype.put;
@@ -169,7 +168,7 @@ test('lost deactivation acknowledgement persists no authorization word and repla
   backend,
 }) => {
   const players = await seed(page, backend);
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await page.getByRole('button', { name: 'Desativar André', exact: true }).click();
   backend.dropNextWrite = true;
   const dialog = page.getByRole('dialog');
@@ -187,7 +186,7 @@ test('lost deactivation acknowledgement persists no authorization word and repla
   );
   await page.reload();
   await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await page.getByLabel('Nome do jogador').fill('Must wait for deactivation');
   await expect(page.getByRole('button', { name: 'Adicionar', exact: true })).toBeDisabled();
   await home(page);
@@ -205,7 +204,7 @@ test('lost deactivation acknowledgement persists no authorization word and repla
   });
 });
 
-test('shared tabs preserve unsaved score input and coordinate a single sync lease', async ({
+test('provisional scores stay in their tab; legacy updates require review and sync lease remains shared', async ({
   page,
   context,
   backend,
@@ -227,18 +226,45 @@ test('shared tabs preserve unsaved score input and coordinate a single sync leas
       await p.getByRole('button', { name: /Abrir Partida/ }).focus();
       await p.keyboard.press('Enter');
     }
-    await score(second, '25', '19');
     await score(page, '21', '18');
-    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
-    await expect(second.getByRole('alert')).toContainText('Seu texto foi mantido');
-    await expect(second.getByRole('textbox', { name: 'Placar Time A', exact: true })).toHaveValue(
-      '25'
-    );
-    await expect(second.getByRole('button', { name: 'Salvar placar', exact: true })).toBeDisabled();
-    await second.getByRole('button', { name: 'Carregar placar atualizado' }).click();
-    await expect(second.getByRole('textbox', { name: 'Placar Time A', exact: true })).toHaveValue(
+    await score(second, '25', '19');
+    expect((await backend.matches())[0]).toMatchObject({ score_a: null, score_b: null });
+    expect((await outbox(page)).queue).toEqual([]);
+    await home(page);
+    await synchronized(page);
+    expect((await backend.matches())[0]).toMatchObject({ score_a: null, score_b: null });
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Partidas', exact: true })
+      .click();
+    await page.getByRole('button', { name: /Abrir Partida/ }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('spinbutton', { name: 'Placar Time A', exact: true })).toHaveValue(
       '21'
     );
+    const game = (await backend.matches())[0];
+    await backend.command('save_score', { id: game.id, version: 1, score_a: 20, score_b: 18 });
+    await home(second);
+    await synchronized(second);
+    await second
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Partidas', exact: true })
+      .click();
+    await second.getByRole('button', { name: /Abrir Partida/ }).focus();
+    await second.keyboard.press('Enter');
+    await expect(second.getByRole('alert')).toContainText('Revise o placar');
+    await expect(
+      second.getByRole('spinbutton', { name: 'Placar Time A', exact: true })
+    ).toHaveValue('25');
+    await second.getByRole('button', { name: 'Usar placar atual' }).click();
+    await expect(
+      second.getByRole('spinbutton', { name: 'Placar Time A', exact: true })
+    ).toHaveValue('20');
+    await home(page);
+    await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
+    await page.getByLabel('Nome do jogador').fill('Lease player');
+    await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Lease player', exact: true })).toBeVisible();
     await home(page);
     await home(second);
     backend.writeGate = new Promise<void>((resolve) => {
@@ -249,9 +275,16 @@ test('shared tabs preserve unsaved score input and coordinate a single sync leas
     release();
     backend.writeGate = null;
     await expect(page.getByText('Tudo sincronizado', { exact: true })).toBeVisible();
-    await expect(second.getByRole('button', { name: 'Sincronizar', exact: true })).toBeEnabled();
-    expect((await outbox(second)).queue).toEqual([]);
-    expect((await backend.matches())[0]).toMatchObject({ version: 2, score_a: 21, score_b: 18 });
+    await page.reload();
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Partidas', exact: true })
+      .click();
+    await page.getByRole('button', { name: /Abrir Partida/ }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('spinbutton', { name: 'Placar Time A', exact: true })).toHaveValue(
+      '20'
+    );
   } finally {
     release();
     backend.writeGate = null;

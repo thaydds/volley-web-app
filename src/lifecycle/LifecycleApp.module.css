@@ -99,20 +99,6 @@
 .member[data-dragging='true'] {
   opacity: 0.6;
 }
-.scoreInput[data-input] {
-  position: relative;
-  inline-size: var(--ds-size-56);
-  min-block-size: var(--ds-size-56);
-}
-.scoreInput input {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  padding: 0;
-  text-align: center;
-  padding-inline: 0;
-}
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -190,4 +176,22 @@
 /* Presence is a tap control, not a drag handle. Preserve browser pan/zoom. */
 .presence button {
   touch-action: manipulation;
+}
+
+.finalScore {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ds-space-16);
+  padding: var(--ds-space-16);
+  background: var(--ds-color-bg-sunken);
+  border-radius: var(--ds-radius-12);
+}
+.finalScore > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-8);
+}
+
+.finalWinner {
+  align-self: flex-start;
 }

@@ -1,7 +1,6 @@
 import type { RefObject } from 'react';
-import { Button, FormField, Modal, Typography } from '@beachsports/components';
+import { Badge, Button, FormField, Modal, Typography } from '@beachsports/components';
 import type { Game, Player } from './domain';
-import { gameTitle, names } from './gameLabels';
 import styles from './LifecycleApp.module.css';
 export type Dialog =
   | { kind: 'deactivate'; player: Player }
@@ -130,8 +129,8 @@ export function DialogViews({
       {dialog?.kind === 'finish' && (
         <Modal
           open
-          title={`Finalizar ${gameTitle(dialog.game).toLocaleLowerCase('pt-BR')}?`}
-          description={`Time A ${dialog.a} × ${dialog.b} Time B. Time ${dialog.a > dialog.b ? 'A' : 'B'} será o vencedor. Depois de finalizar, o resultado não poderá ser editado.`}
+          title="Finalizar partida?"
+          description="O resultado final não poderá ser editado."
           busy={busy}
           onClose={onClose}
           actions={
@@ -143,8 +142,22 @@ export function DialogViews({
             </>
           }
         >
-          <Typography variant="text-s">Time A: {names(dialog.game, 'A')}</Typography>
-          <Typography variant="text-s">Time B: {names(dialog.game, 'B')}</Typography>
+          <div className={styles.finalScore}>
+            <div>
+              <Typography variant="label-m">Time A</Typography>
+              <Typography variant="heading-l">{dialog.a}</Typography>
+            </div>
+            <div>
+              <Typography variant="label-m">Time B</Typography>
+              <Typography variant="heading-l">{dialog.b}</Typography>
+            </div>
+          </div>
+          <Badge
+            className={styles.finalWinner}
+            size="sm"
+            tone="success"
+            label={`Time ${dialog.a > dialog.b ? 'A' : 'B'} · Vencedor`}
+          />
           {!online && (
             <Typography variant="text-s">
               A finalização ficará salva neste aparelho e pendente de sincronização.
