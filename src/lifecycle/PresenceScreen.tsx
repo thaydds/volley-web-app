@@ -6,6 +6,7 @@ import styles from './LifecycleApp.module.css';
 export function PresenceScreen({
   active,
   presence,
+  saving,
   locked,
   error,
   name,
@@ -19,6 +20,7 @@ export function PresenceScreen({
 }: {
   active: Player[];
   presence: string[];
+  saving: boolean;
   locked: boolean;
   error: string;
   name: string;
@@ -41,7 +43,7 @@ export function PresenceScreen({
       footer={
         <Button
           className={styles.full}
-          disabled={locked || selected.length < 2}
+          disabled={locked || saving || selected.length < 2}
           onClick={onPrepare}
         >
           Sortear times
@@ -60,13 +62,15 @@ export function PresenceScreen({
           {error}
         </Typography>
       )}
-      <ul className={styles.chips}>
+      <ul className={`${styles.chips} ${styles.presence}`} aria-busy={saving || undefined}>
         {active.map((player) => (
           <li key={player.id}>
             <Chip
               label={player.name}
               size="md"
               selected={presence.includes(player.id)}
+              // Reserve the public icon slot; Chip draws its own check when selected.
+              icon={<span />}
               showSelectionIndicator
               disabled={locked}
               onSelectedChange={() => onPresence(player.id)}

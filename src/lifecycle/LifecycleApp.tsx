@@ -9,6 +9,7 @@ import { PrepTeams } from './PrepTeams';
 import { MatchPanel } from './MatchPanel';
 import { gameTitle } from './gameLabels';
 import { useLifecycle } from './useLifecycle';
+import { usePresenceSelection } from './usePresenceSelection';
 import {
   canonicalName,
   displayName,
@@ -43,6 +44,13 @@ function download(data: unknown, name: string) {
 export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
   const sync = useLifecycle(apiUrl);
   const { engine, state, data } = sync;
+  const selection = usePresenceSelection({
+    presence: state.presence,
+    locked: sync.locked,
+    store: engine.store,
+    reload: sync.reload,
+    onError: sync.setError,
+  });
   const [view, setView] = useState<View>(() =>
     /^#match=[a-f\d-]+$/.test(location.hash) ? 'game' : 'home'
   );
@@ -95,7 +103,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
     data?.players
       .filter((p) => !p.deleted_at)
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')) ?? [];
-  const selected = active.filter((p) => state.presence.includes(p.id));
+  const selected = active.filter((p) => selection.presence.includes(p.id));
   const pendingFor = (id: string) => state.queue.some((c) => c.input.id === id);
   function go(next: View) {
     sync.setError('');
@@ -121,13 +129,6 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
   }
   async function local(change: (s: typeof state) => void) {
     return sync.run(() => engine.store.edit(change));
-  }
-  async function presence(id: string) {
-    await local((s) => {
-      s.presence = s.presence.includes(id)
-        ? s.presence.filter((p) => p !== id)
-        : [...s.presence, id];
-    });
   }
   async function add(event: FormEvent) {
     event.preventDefault();
@@ -415,8 +416,9 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
       {view === 'roster' && (
         <PresenceScreen
           active={active}
-          presence={state.presence}
-          locked={sync.locked}
+          presence={selection.presence}
+          saving={selection.pending}
+          locked={sync.locked || selection.recovering}
           error={sync.error}
           name={name}
           nameError={nameError}
@@ -425,7 +427,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
             setNameError('');
           }}
           onBack={() => go('home')}
-          onPresence={(id) => void presence(id)}
+          onPresence={selection.toggle}
           onPrepare={() => void prepare(selected.map((p) => p.id))}
           onDeactivate={(player) => modal({ kind: 'deactivate', player })}
           onAdd={(event) => void add(event)}

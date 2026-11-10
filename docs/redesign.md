@@ -99,3 +99,9 @@ continuam usando suas composições atuais; a adoção dos novos cards exige uma
 migração própria. A auditoria do DS registra pendências de contraste nos badges
 Light desses novos cards e de vínculos no Figma; atualizar a dependência não
 resolve essas pendências nem certifica a paridade completa com o design.
+
+## Correção da presença: resposta imediata e geometria estável
+
+A seleção de presença tem feedback otimista imediato e persistência local ordenada, sem bloquear todos os chips enquanto o IndexedDB confirma. Toques rápidos no mesmo jogador conservam a última intenção; mudanças em jogadores distintos são preservadas. Falha de armazenamento reconcilia o estado salvo e mostra erro, sem fingir confirmação. Sortear fica indisponível até concluir a persistência. Não há chamada de API ao marcar presença.
+
+O slot público `icon` do Chip recebe um placeholder vazio: reserva a mesma área nos dois estados, e o próprio DS desenha o check quando selecionado. Não há check visível no Default, mudança de largura/altura, medição imperativa de texto ou largura fixa para todos os nomes. A composição usa components0.7.0 já publicada e dispensa nova release do DS. Gestos de presença usam touch-action:manipulation, preservando pan/zoom; arraste do pré-jogo continua separado.

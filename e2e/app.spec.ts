@@ -236,3 +236,44 @@ test('pregame pointer drag moves the real DS chip without starting or changing a
   await expect(page.getByTestId('draw-team-b').locator(`[data-player-id="${id}"]`)).toBeVisible();
   expect(await backend.matches()).toEqual([]);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`presence taps keep geometry and rapid toggles survive reload / ${theme}`, async ({
+    page,
+    backend,
+  }) => {
+    await seed(page, backend, ['André', 'Lana', 'Andressa'], theme);
+    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    const chip = page.getByRole('button', { name: 'André', exact: true });
+    const before = await chip.locator('..').boundingBox();
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    const after = await chip.locator('..').boundingBox();
+    expect(after!.width).toBe(before!.width);
+    expect(after!.height).toBe(before!.height);
+    await expect(chip).toBeEnabled();
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    expect((await chip.locator('..').boundingBox())!.width).toBe(before!.width);
+    // Synchronous rapid events must not be dropped by a global storage busy flag.
+    await chip.evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement)) throw new Error('Expected native chip button');
+      button.click();
+      button.click();
+      button.click();
+    });
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Lana', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Sortear times', exact: true })).toBeEnabled();
+    await page.reload();
+    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Lana', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+  });
+}
