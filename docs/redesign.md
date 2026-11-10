@@ -1,4 +1,30 @@
-# Migração do app para Beach Sports DS
+# Referências de design e evolução do Volley
+
+## Proposta atual: API e ciclo offline · 10 nov 2026
+
+Fonte: [frames atuais](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496), inspecionados por screenshots e metadata; nenhum write no Figma. Implementação em revisão, sem publicação.
+
+| Fluxo                       | Nodes Figma                          | Implementação                                                                                                   |
+| --------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Home Light/Dark             | 2124:9497 / 2124:10734               | LifecycleApp + Page; navegação inferior horizontal, sincronização manual, Cartas indisponível, versão do build. |
+| Presença Light/Dark         | 2124:9595 / 2124:10832               | PresenceScreen; cadastro na mesma tela, chips naturais com check selecionado, remoção separada.                 |
+| Pré-jogo                    | 2124:9686                            | PrepTeams; drag e alternativa acessível; badges complementares no título; inicia outra entidade de partida.     |
+| Em andamento / placar       | 2184:16973 / 2184:16993 / 2184:17980 | MatchPanel; ScoreMatch com slots de dois Inputs DS 56×56, labels/participantes preservados.                     |
+| Confirmar finalização       | 2184:20090                           | Modal DS com times, placar, vencedor derivado e aviso de imutabilidade.                                         |
+| Desativar / erro / reativar | 2184:19935 / 2184:19992 / 2184:20135 | Modais DS; palavra em memória, erro no campo, autorização DB, reativação explícita do UUID.                     |
+| Finalizadas / carregamento  | 2124:10622 / 2184:17061              | Somente números e leitura; spinner sem texto visual, com nome acessível.                                        |
+
+O slot nativo Score content do Live permite inputs no lugar dos números; Finished permanece numérico. A [PR #24 do DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) acrescenta composição tipada sem duplicar/desanexar ScoreMatch ou mudar labels existentes. O artefato de revisão do app registra exatamente commit/SHA256; substituir pela release aprovada antes da adoção normal em produção.
+
+A correção aprovada do Chip segue documentação2098:55311: padding esquerdo16, gap8, direito0 depois do × com área44. O master tinha direito16; esta divergência foi documentada na PR DS, sem alterar tokens canônicos. O scrim do Modal continua a exceção documentada da versão0.6.0 do DS; não inventamos token de overlay.
+
+Valores de exemplo do Figma (nomes, horários, contagens, versão v0.1.2) vêm de dados/revisão reais. Novo sorteio tem algoritmo e papéis aleatórios; não copia os times da amostra. Falhas, respostas incertas, conflitos e pendências são estados reais, não ações de demonstração. A diferença offline foi expressamente aprovada: agora há gravação local persistida, envio manual e tratamento de dependências, substituindo consulta offline apenas. O histórico anterior permanece preservado, com placar desconhecido quando não existia.
+
+Light/Dark usam os mesmos tokens;320px mantém inputs em duas colunas, sem card separado Placar. A composição usa CSS Modules e controles DS. Testes verificam inputs56, badges na mesma linha, reflow, teclas e axe; isso não significa comparação pixel a pixel nem certifica todos os masters do DS.
+
+As seções abaixo são o registro histórico das versões anteriores e não descrevem o contrato desta branch.
+
+## Registro histórico: migração do app para Beach Sports DS
 
 ## Referência
 

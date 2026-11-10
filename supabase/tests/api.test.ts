@@ -203,3 +203,108 @@ describe('keyless browser API', () => {
     expect(http).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('lifecycle API boundaries', () => {
+  it('keeps authorization a separate bounded parameter and never echoes it on denial', async () => {
+    const word = 'test-only-never-production';
+    const http = vi
+      .fn()
+      .mockResolvedValueOnce(response({ id }))
+      .mockResolvedValueOnce(response({ error: 'authorization_invalid' }));
+    const result = await createHandler(
+      config,
+      http
+    )(
+      request(
+        'deactivate',
+        { request_id: id, input: { id, version: 1 }, authorization_word: word },
+        'valid.token'
+      )
+    );
+    expect(result.status).toBe(403);
+    expect(await result.json()).toEqual({ error: 'authorization_invalid' });
+    expect(http.mock.calls[1][0]).toBe(
+      `${config.supabaseUrl}/rest/v1/rpc/volley_deactivate_player`
+    );
+    expect(JSON.parse(http.mock.calls[1][1].body)).toEqual({
+      p_request_id: id,
+      p_input: { id, version: 1 },
+      p_authorization_word: word,
+    });
+    expect(http.mock.calls[1][1].headers.Authorization).toBe('Bearer valid.token');
+  });
+  it('rejects authority injection, arbitrary functions and attempts to choose a winner', async () => {
+    const inputs = [
+      ['command', { request_id: id, operation: 'deactivate_player', input: { id, version: 1 } }],
+      [
+        'command',
+        {
+          request_id: id,
+          operation: 'finish_match',
+          input: { id, version: 1, score_a: 21, score_b: 18, winner: 'B' },
+        },
+      ],
+      [
+        'command',
+        {
+          request_id: id,
+          operation: 'save_score',
+          input: { id, version: 1, score_a: -1, score_b: 18 },
+        },
+      ],
+      [
+        'command',
+        {
+          request_id: id,
+          operation: 'start_match',
+          input: {
+            id,
+            played_on: '2026-11-10',
+            serving_side: 'A',
+            participants: [
+              { player_id: id, side: 'A' },
+              { player_id: id, side: 'B' },
+            ],
+          },
+        },
+      ],
+      [
+        'deactivate',
+        { request_id: id, input: { id, version: 1, admin: true }, authorization_word: 'word' },
+      ],
+      ['state', { resource: 'private.deactivation_policy', limit: 1, offset: 0 }],
+      ['recover', { request_id: id, operation: 'create_player', input: {}, sql: 'drop table' }],
+    ] as const;
+    for (const [action, body] of inputs) {
+      const http = vi.fn().mockResolvedValueOnce(response({ id }));
+      const result = await createHandler(config, http)(request(action, body, 'valid.token'));
+      expect(result.status).toBe(400);
+      expect(http).toHaveBeenCalledTimes(1);
+    }
+  });
+  it('maps missing authorization, throttling and unsupported clients without exposing internals', async () => {
+    for (const [data, upstream, status, error] of [
+      [{ error: 'authorization_not_configured' }, 200, 503, 'authorization_not_configured'],
+      [{ error: 'authorization_rate_limit' }, 200, 429, 'authorization_rate_limit'],
+      [{ code: 'PT409', message: 'client_update_required' }, 409, 426, 'client_update_required'],
+      [{ code: 'P0002', message: config.supabaseKey }, 404, 404, 'entity_not_found'],
+    ] as const) {
+      const http = vi
+        .fn()
+        .mockResolvedValueOnce(response({ id }))
+        .mockResolvedValueOnce(response(data, upstream));
+      const result = await createHandler(
+        config,
+        http
+      )(
+        request(
+          'deactivate',
+          { request_id: id, input: { id, version: 1 }, authorization_word: 'test-only' },
+          'valid.token'
+        )
+      );
+      expect(result.status).toBe(status);
+      expect(await result.json()).toEqual({ error });
+    }
+  });
+});

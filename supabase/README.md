@@ -1,176 +1,103 @@
-# Volley — banco, API e integração
+# Volley — contrato de dados, API e operações offline
 
-A PR #10 contém a integração completa das telas, migração com prévia e consulta
-offline. Seis migrations foram aplicadas ao projeto `xejuimptprhvrjohhqyn` e a
-Edge Function `volley-api` foi publicada. O app publicado ainda depende do merge.
+O novo ciclo de partidas está implementado nesta branch, com a migration aditiva `20261110150000_match_lifecycle.sql`. **Não foi aplicada nem publicada em produção nesta entrega.** As seis migrations anteriores pertencem à integração v1. A evidência remota da v1 no fim deste arquivo não certifica a nova versão.
 
-**Acesso habilitado e validação real concluída:** o usuário ativou Anonymous
-Sign-Ins. Dois clientes independentes acessaram a API publicada, compartilharam
-jogadores, partidas e ranking, renovaram sessão e verificaram conflitos,
-restauração, importação e deduplicação. O app publicado será atualizado pelo merge.
-Os limites reais foram exercitados apenas em uso normal, sem teste de carga ou
-esgotamento de quotas. A configuração local em config.toml não altera o remoto.
+## Arquitetura e credenciais
 
-## Arquitetura e chaves
+Navegador → Edge Function `volley-api` → RPCs fixas → tabelas privadas PostgreSQL com RLS.
 
-Navegador → Edge Function → três RPCs fixas → sete tabelas privadas com RLS.
+O frontend recebe somente a URL pública da API e tokens temporários de sessão anônima. Nenhuma chave de projeto, `service_role`, configuração administrativa ou palavra-chave de desativação está no build. O servidor usa as variáveis de runtime `SUPABASE_URL` e `SUPABASE_ANON_KEY`; para dados, encaminha o token do visitante validado online por `/auth/v1/user`, sem elevar seu papel. Bootstrap/refresh usam Auth no servidor. Não há CAPTCHA ou tela de login.
 
-O build inclui somente a URL pública da API em `.env.production`. Nenhuma chave
-Supabase vai para o frontend. A função usa SUPABASE_URL e SUPABASE_ANON_KEY do
-runtime, nunca service_role. Em Auth, envia a chave de aplicação também como
-Bearer de fallback, como o SDK oficial; em consultas/gravações, o Bearer é sempre
-o token de sessão recebido do usuário, validado online por `/auth/v1/user`.
+Access/refresh tokens são credenciais da sessão e ficam separados dos dados/backup. Proteção contra XSS continua necessária; o app renderiza nomes como texto. Tokens, palavras e respostas internas não são registrados em logs ou URLs. CORS restringe a origem, mas não substitui autorização nem impede clientes externos.
 
-O navegador recebe access/refresh tokens temporários, guardados separadamente
-no armazenamento da origem para reutilizar a sessão. São credenciais de usuário
-que exigem proteção contra XSS; não devem ir para URLs, logs ou relatórios. O
-app renderiza nomes como texto, sem HTML injetado. Não existe CAPTCHA, widget,
-site key, secret Turnstile ou tela de login.
+## Estrutura: nove tabelas privadas
+
+| Tabela                   | Conteúdo e regras                                                                                                                                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `players`                | UUID, nome, versão, datas e `deleted_at`. Desativação lógica; reativação conserva o UUID. Novos nomes normalizados não colidem com ativos/inativos. Duplicatas históricas não são mescladas pela migration. |
+| `matches`                | UUID, número gerado pelo banco, data, versão, `status`, dois placares inteiros opcionais, vencedor, `serving_side`, marcador `legacy_result` e arquivo legado. Resultado final é imutável.                  |
+| `match_players`          | Vínculos UUID, lado, posição e nome histórico. Composição congelada depois de iniciar.                                                                                                                      |
+| `mutation_receipts`      | UUID global da operação, entrada e resposta aceita. Mesmo UUID/entrada retorna a confirmação anterior; entrada diferente é conflito. Não contém palavra-chave.                                              |
+| `audit_events`           | Operação, ator, entidade, antes/depois e revisão consistente. Sem palavra-chave.                                                                                                                            |
+| `actor_limits`           | Limite existente de 60 mutações aceitas/minuto/sessão. Replays aceitos não contam como nova escrita.                                                                                                        |
+| `import_records`         | Deduplicação dos registros legados por origem/chave.                                                                                                                                                        |
+| `deactivation_policy`    | Configuração administrativa privada: salt e digest SHA256 da frase de alta entropia. Nunca exposta por RPC. Sem valor padrão.                                                                               |
+| `authorization_attempts` | Tentativas de autorização, inclusive incorretas: até 5 por sessão e 30 globais por janela de minuto. Não guarda a palavra.                                                                                  |
+
+`anon`/`authenticated` não têm acesso direto ao schema/tabelas/sequências privadas. O papel `volley_api_owner` é interno, sem login, BYPASSRLS ou CREATE persistente. Funções públicas expostas são intencionalmente `SECURITY DEFINER`, com `search_path` vazio e concessões explícitas; auxiliares e configuração administrativa não podem ser chamadas pelo visitante. Consultas são SQL fixo com parâmetros, nunca SQL construído de nomes ou entradas do cliente.
 
 ## Contrato HTTP
 
-Todos os endpoints usam POST, JSON e `Cache-Control: no-store`. O servidor limita
-os bytes efetivamente recebidos a 32 KiB e não retorna mensagens SQL, chaves ou
-metadados internos. `verify_jwt=false` é intencional: o próprio handler verifica
-online os tokens de todas as operações protegidas; bootstrap/refresh têm
-contratos específicos.
+POST + JSON, `Cache-Control: no-store`, origem permitida explícita e corpo efetivamente lido limitado a 32 KiB. `verify_jwt=false` na Edge é intencional: cada rota protegida valida o Bearer online, e PostgREST valida o JWT antes da RPC. Erros não revelam SQL, chave ou metadados internos.
 
-| Endpoint   | Corpo                                                                                      | Autorização                               |
-| ---------- | ------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| `/session` | `{}`                                                                                       | Sessão anônima automática; quotas do Auth |
-| `/refresh` | `{ "refresh_token": "..." }`                                                               | Token de renovação                        |
-| `/read`    | `{ "resource": "players", "limit": 200, "offset": 0 }`                                     | Bearer de usuário                         |
-| `/mutate`  | `{ "operation": "create_player", "request_id": "UUID", "input": { "name": "Nome" } }`      | Bearer de usuário                         |
-| `/import`  | `{ "request_id": "UUID", "input": { "source_id": "UUID", "players": [], "matches": [] } }` | Bearer de usuário                         |
+| Rota               | Entrada                                              | Resultado                                                                                                                                     |
+| ------------------ | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/session`         | `{}`                                                 | Sessão anônima automática, sujeita às quotas Auth.                                                                                            |
+| `/refresh`         | `{refresh_token}`                                    | Renovação da sessão.                                                                                                                          |
+| `/state`           | `{resource,limit,offset}`                            | `players` (ativos e desativados), `matches`, `archived_matches`; páginas até 200, com revisão.                                                |
+| `/command`         | `{request_id,operation,input}`                       | Uma operação do ciclo abaixo, com entidade/versão/revisão confirmadas.                                                                        |
+| `/deactivate`      | `{request_id,input:{id,version},authorization_word}` | Desativação online autorizada; palavra transitória, separada do payload persistido.                                                           |
+| `/recover`         | `{request_id,operation,input}`                       | Somente prova de recibo já aceito (`found`); não executa uma intenção antiga desconhecida.                                                    |
+| `/import`          | `{request_id,input:{source_id,players,matches}}`     | Importação histórica online, com prévia, transação e deduplicação.                                                                            |
+| `/read`, `/mutate` | Contratos v1 restritos                               | Compatibilidade de leitura/recibos. Novas operações v1 de arquivo/resultado são recusadas com HTTP 426, sem eliminar envios incertos antigos. |
 
-Leituras: players, matches, archived_matches e ranking. Cada página traz uma
-revision. O cliente busca todas as páginas e só substitui o cache depois de
-obter uma revisão consistente em todos os recursos; até três tentativas se a
-base mudar durante a leitura. Erro nunca é convertido em lista vazia.
+Operações `/command` (somente estes campos):
 
-Mutações: create_player, rename_player, archive_player, restore_player,
-create_match, set_match_winner, archive_match e restore_match. Campos exatos,
-UUIDs, versões, participantes, tamanhos, datas e valores são validados. SQL
-estático com parâmetros; nomes de tabela ou comandos SQL não são entradas da API.
+| Operação            | `input`                                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `create_player`     | `{id,name}`: UUID gerado uma vez no aparelho, nome até 30 caracteres.                                                             |
+| `reactivate_player` | `{id,version}`: decisão explícita, mesmo histórico.                                                                               |
+| `start_match`       | `{id,played_on,serving_side,participants:[{player_id,side}]}`: UUID persistente, lados A/B não vazios, sem participante repetido. |
+| `save_score`        | `{id,version,score_a,score_b}`: dois inteiros entre 0 e 2147483647. Empate pode ser salvo.                                        |
+| `finish_match`      | Mesmos campos: empate proibido, vencedor derivado pelo banco; bloqueia mudanças posteriores.                                      |
 
-## Dados e concorrência
+Campos extras, escolha de vencedor pelo cliente, autorização pela rota genérica e acesso a função/tabela arbitrária são rejeitados. Conflito retorna 409; palavra incorreta 403; excesso de tentativas 429; autorização ausente 503. Falhas de serviço/contrato não descartam a fila. Mesmo chamando RPC diretamente, o visitante precisa da autorização de desativação e não consegue editar/excluir uma partida finalizada.
 
-- players, matches e match_players: IDs permanentes, números gerados no banco,
-  times, resultados e nomes históricos. Uma vitória vale um ponto; sem vencedor
-  não pontua. Ranking usa UUID, inclusive após renomear ou remover do elenco.
-- mutation_receipts: UUID global de requisição. Reenvio igual retorna a resposta
-  original mesmo após recriar a sessão. Payload diferente com o mesmo UUID é
-  conflito. A versão esperada impede sobrescrever edições concorrentes.
-- audit_events: rastreio interno; não é retornado pela API.
-- actor_limits: 60 mutações aceitas por minuto por sessão; replays não consomem
-  nova gravação. Um lote de importação conta como uma mutação, sem expor um
-  mecanismo público de desativar esse limite.
-- import_records: deduplicação de cada chave legada por aparelho/origem.
-- Escritas são serializadas para ordenar a revisão da base e garantir a coerência
-  das páginas. Partida, participantes, resultado importado e recibos de um lote
-  são transacionais. Conflito ou entrada inválida desfaz o lote inteiro.
-- Remoção é lógica. A interface permite listar removidas e restaurar partidas;
-  uma partida removida sai do ranking e a restauração repõe sua contribuição.
+## Persistência e sincronização
 
-Papéis anon/authenticated não acessam tabelas, sequências ou schema privado.
-Somente as três RPCs públicas têm EXECUTE para authenticated. O papel interno
-volley_api_owner não tem login, BYPASSRLS nem CREATE nos schemas. Auxiliares
-privadas não podem ser chamadas por esses papéis. O schema de Auth do provedor
-não foi liberado ao papel customizado; ele usa a mesma extração de claims
-verificados de auth.uid(). PostgREST verifica JWT antes de estabelecer o contexto.
+`src/lifecycle` separa tipos/projeção, transporte, IndexedDB, fila e telas. Um registro transacional por URL da API contém snapshot confirmado, fila FIFO, presença, pré-jogo, pendência segura de desativação, envios v1 antigos e lease de sincronização. A UI só confirma uma ação após commit local; falta de espaço não apaga o formulário nem finge sucesso. Dados inválidos no armazenamento geram recuperação/backup, sem reset silencioso.
 
-O Advisor mantém três ocorrências intencionais de SECURITY DEFINER executável
-por authenticated. [Critério e recomendações](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
-A função administrativa rls_auto_enable continua como event trigger e não pode
-ser executada pelos papéis do navegador.
+Cada ação local tem UUID fixo e versão esperada capturada. O snapshot é projetado com a fila para consulta/ranking offline. Dependências seguem criar jogador → iniciar partida → salvar → finalizar. O número da partida é atribuído somente pelo banco; antes, aparece como local. Finalizada offline fica imediatamente somente leitura, com sincronização pendente.
 
-## Telas, cache e envios incertos
+Na abertura, busca os dados atuais sem reenviar a fila. Havendo cache, ele permite abrir offline ou após falha da consulta. Sem cache, erro com Tentar novamente; spinner inicial tem apenas nome acessível. Voltar à aba lê alterações locais de outras abas, sem enviar operações. **Reconectar não envia automaticamente.**
 
-O app carrega os dados ao abrir, voltar à aba, reconectar ou tocar em Atualizar.
-Ranking, jogadores e histórico usam o servidor. Presença usa IDs e fica somente
-no aparelho; sorteio em andamento, tema e fonte também são locais.
+Sincronizar na Home adquire lease local, envia em ordem, persiste cada confirmação e depois busca a base. Falha entre commit remoto e confirmação local conserva UUID/payload; repetir recupera o recibo, mesmo com nova sessão. BroadcastChannel notifica abas; lease expira após 60 s, revalidado antes dos requests. Idempotência e versões protegem replays após suspensão/expiração; não é um lock distribuído de segurança.
 
-O cache é identificado pela URL da API e guarda apenas a última consulta completa,
-com horário visível. Offline permite consulta, bloqueando cadastros/resultados,
-remoções e restaurações. Não há fila de novas gravações offline.
+Conflito interrompe a fila, mantém operações e oferece revisão com a versão atual e a intenção local, exportação e escolha explícita do servidor. Só essa confirmação descarta o comando escolhido e dependentes transitivos; alterações independentes permanecem. Não há rebase automático, sobrescrita silenciosa ou realtime. Alteração não salva nos inputs também não é substituída silenciosamente por outra aba: conserva texto e exige revisão antes de salvar.
 
-Antes de uma mutação, o cliente persiste seu UUID e payload. Se a resposta se
-perder, conserva o envio pendente inclusive após recarregar, bloqueia novos envios
-incompatíveis e oferece Repetir envio pendente. Não reenvia automaticamente ao
-reconectar. Recibos globais evitam duplicação mesmo se a sessão precisar ser
-recriada. Uma confirmação de gravação não é invalidada por uma falha posterior
-na consulta; a interface distingue atualização pendente de novos envios.
+Falha somente na consulta depois de escritas confirmadas não recria suas operações. Desativação tem confirmação validada e persistida antes de fechar o modal, sem depender de atualizar dados não relacionados. Se a resposta for incerta, conserva só envelope/UUID/versão; pede novamente a palavra para recuperar o mesmo recibo. A palavra permanece exclusivamente na memória do campo e no transporte HTTPS enquanto necessária.
 
-Produção sem URL configurada mostra indisponibilidade, sem voltar silenciosamente
-a gravações locais. `LocalApp` fica somente como prévia legada para desenvolvimento
-sem VITE_VOLLEY_API_URL e para os testes unitários já existentes. Para desenvolver
-a integração, configure essa variável com uma API própria de desenvolvimento e
-uma origem explicitamente permitida; não libere origens arbitrárias em produção.
+## Preservação e versão anterior
 
-## Importação
+A migration conserva UUIDs, números, participantes, nomes, datas e arquivo legado. Resultados anteriores com vencedor tornam-se finalizados com placares desconhecidos (`null`, UI `—`). Não inventa pontuação. Registros antigos sem vencedor ficam em andamento. Arquivados anteriores continuam consultáveis, sem novos controles de edição/exclusão/restauração.
 
-O `volley-v1` antigo não é sobrescrito ou apagado. Uma prévia mostra jogadores,
-partidas válidas, erros e possíveis duplicatas, com download da cópia original.
-Itens inválidos ficam fora do envio com aviso, sem destruir a fonte original.
+`volley-v1`, cache e presença anteriores não são apagados. A nova base IndexedDB incorpora o cache conhecido e presença por UUID. A importação continua com prévia, duplicatas desmarcadas, seleção explícita e cópia original disponível. Recibos aceitos e origem/chave impedem reimportar o mesmo registro. Nome igual não resolve homônimos automaticamente: revise a prévia e diferencie pessoas; se um nome desativado colidir, reative explicitamente ou corrija a origem antes de importar.
 
-Possíveis duplicatas consideram data e os dois times, inclusive invertidos e
-partidas removidas. Começam desmarcadas; uma repetição legítima pode ser selecionada
-explicitamente. O banco também verifica uma duplicata surgida em outro aparelho
-entre a prévia e o envio e exige revisão. Não tenta identificar pessoas além da
-regra existente de nomes únicos normalizados; jogadores homônimos exigem revisão.
+Envios v1 ainda incertos são conservados em `legacyPending`. Verificar envios antigos consulta apenas recibos; não repete ações que a nova versão deixou de permitir. Intenção não confirmada requer backup e descarte explícito, seguido de recriação manual se desejado. O armazenamento original continua intacto. O backup exclui tokens de sessão e inclui dados/fila, não segredos.
 
-A origem recebe UUID persistente e cada partida mantém uma chave legada estável.
-O número exibido após importar é o número novo do banco. Nomes de jogadores são
-reaproveitados sem distinção de caixa. A seleção é dividida em lotes menores que
-24 KiB, preservando todas as partidas escolhidas. Cada lote é atômico; se houver
-falha depois de um lote concluído, a repetição retoma com deduplicação por origem.
-A cópia completa continua disponível no aparelho mesmo após a conclusão.
+## Ativação
 
-## Limites e verificação antes do merge
+Esta PR não ativa o novo serviço. Antes de produção:
 
-O acesso compartilhado continua aberto: qualquer visitante com sessão pode
-alterar os dados pelas operações aprovadas. Não há propriedade por usuário;
-created_by é auditoria. CORS não distingue humanos de robôs. Quotas reduzem
-abuso, mas não eliminam sessões múltiplas ou indisponibilidade por esgotamento.
+1. Revisar e aprovar a PR #24 do DS; publicar a versão por autorização separada e substituir o artefato `file:vendor/...` por dependência npm exata no app.
+2. Fazer backup do banco e ensaiar todas as migrations numa base de staging com cópia representativa do legado. Conferir contagens, permissões, históricos com/sem vencedor e arquivos anteriores. Não usar `remote-checks.sql` antigo como certificação deste ciclo.
+3. Aplicar a migration aditiva e publicar o novo handler em staging. Validar Auth/renovação, dois dispositivos reais, quotas, conflitos e resposta perdida, com a mesma origem/configuração prevista para produção.
+4. Definir a frase de autorização com o responsável. Usar valor aleatório de alta entropia, guardado em gerenciador seguro. Um administrador configura `private.configure_deactivation_secret(text)` por sessão TLS e parâmetro vinculado, sem literal em script versionado, URL, histórico de terminal, relatório ou chat. O visitante e a Edge não têm permissão para configurar. A configuração está ausente por padrão: desativação falha fechada; demais fluxos podem ser revisados/testados com fixtures locais.
+5. Obter autorização de publicação/migração/deploy, coordenar banco → Edge → app e verificar a versão publicada. Clientes v1 antigos não podem finalizar/excluir pelo contrato anterior; solicitar atualização. Preservar backups e recibos durante a transição. Não reverter a migration removendo colunas ou dados para recuperar a UI antiga.
 
-Auth pode aplicar limites ao IP de saída da Edge Function e agrupar visitantes.
-Não encaminhamos IP fornecido pelo navegador nem adicionamos chaves administrativas
-para mudar esse comportamento. Validar criação, renovação, quotas e acesso por
-dois clientes no Supabase real depois de habilitar Anonymous Sign-Ins.
+Preparar PR não concede autorização para esses passos em produção. A frase real ainda não foi definida nesta entrega.
 
-A função responde sem expor internals se esse acesso for desabilitado. Os testes de banco com contexto JWT simulado passaram no projeto
-real, incluindo importação, rejeição de duplicatas, revisão e permissões. Todos
-os registros de teste foram desfeitos; contagens finais de jogadores, partidas,
-participantes, recibos, importações e auditoria foram zero. Sequências podem ter
-intervalos após rollback.
+## Validação e limites
 
-Os testes de navegador usam o build de produção, o handler real da API e as
-migrations reais em PostgreSQL WASM (PGlite); somente o serviço externo de Auth é
-simulado. Não acessam o banco real nem usam suas chaves. Verificam dois contextos,
-conflitos, restauração, cache offline, falhas e resposta perdida após commit.
-Isso não certifica GoTrue, limites remotos ou concorrência entre conexões reais.
+`npm run test:backend`: SQL de todas as migrations em PGlite, grants/RLS, legado, imutabilidade, autorização/rate limit, recibos e handler. `npm run test:coverage`: regras, projeção da fila, ranking por UUID e interações. `npm run test:e2e`: build real, handler e SQL locais, Auth externo simulado; Light/Dark, 393/320/1440px, teclado, offline/reload, resposta incerta, dispositivos independentes, abas, conflitos, armazenamento e recuperação.
 
-Audit de dependências em 2026-11-09: zero alertas em `npm audit --omit=dev`.
-O audit completo ainda informa 22 alertas anteriores na toolchain, incluindo
-high/critical em Vite/Vitest/tinypool. Não foram introduzidos por esta integração;
-a atualização das ferramentas continua pendente e não há certificação de risco zero.
+Esses testes não certificam GoTrue, políticas/quotas remotas, concorrência entre conexões PostgreSQL reais ou a implantação atual. Nenhum dado foi gravado em produção nesta entrega. O acesso segue compartilhado: visitantes podem cadastrar e registrar resultados; não há propriedade por usuário. Quotas e palavra-chave reduzem abuso, mas não garantem disponibilidade contra múltiplas sessões. A ausência de CAPTCHA foi uma decisão explícita da usuária.
 
-## Validação
+A toolchain tinha alertas de auditoria anteriores à mudança; não atualizamos dependências de ferramentas como parte deste fluxo. Os scripts de revisão não publicam no npm. O pacote de componentes é identificado por commit/SHA256 e deve ser substituído antes da adoção normal em produção.
 
-`npm run test:backend`: contratos da API, cliente, migração, SQL e papéis.
-`npm run test:coverage`: regras e interações existentes.
-`npm run test:e2e`: fluxos do app de produção em 393px, 320px e desktop.
-`npm run typecheck`: frontend, backend e suporte de testes.
-`tests/remote-checks.sql`: verificação manual no projeto vazio antes da ativação,
-com rollback; não executar automaticamente em produção.
+Referências: [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [sessões anônimas](https://supabase.com/docs/guides/auth/auth-anonymous), [chaves](https://supabase.com/docs/guides/getting-started/api-keys), [limites Auth](https://supabase.com/docs/guides/auth/rate-limits).
 
-Referências: [chaves](https://supabase.com/docs/guides/getting-started/api-keys),
-[RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
-[acesso anônimo](https://supabase.com/docs/guides/auth/auth-anonymous),
-[quotas](https://supabase.com/docs/guides/auth/rate-limits),
-[erros de Auth](https://supabase.com/docs/guides/auth/debugging/error-codes).
-
-## Verificação HTTP no Supabase real
+## Evidência histórica: integração v1 no Supabase real
 
 Em 2026-11-10 UTC, após a habilitação pelo usuário, o cliente real em src/shared/client.ts
 foi executado contra a Edge Function publicada, sem chaves de projeto no cliente.

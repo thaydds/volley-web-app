@@ -1,4 +1,6 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import react from '@vitejs/plugin-react';
 import { tokens } from '@beachsports/tokens';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -6,7 +8,20 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Deployed under a GitHub Pages subpath, so scope/start_url/icons must use it too.
 const base = '/volley-web-app/';
 
+const packageVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+function buildRevision() {
+  try {
+    return `${execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], { encoding: 'utf8' }).trim()}${execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() ? '.dirty' : ''}`;
+  } catch {
+    return 'local';
+  }
+}
 export default defineConfig({
+  define: { __APP_BUILD_VERSION__: JSON.stringify(`${packageVersion}+${buildRevision()}`) },
   base,
   plugins: [
     react(),

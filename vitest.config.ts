@@ -13,6 +13,7 @@ export default defineConfig({
       reporter: ['text', 'html'],
       reportsDirectory: './coverage',
       include: [
+        'src/lifecycle/domain.ts',
         'src/roster/**/*.{ts,tsx}',
         'src/matchmaking/**/*.{ts,tsx}',
         'src/home/**/*.{ts,tsx}',
