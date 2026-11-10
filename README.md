@@ -4,7 +4,7 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 [Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) · [App publicado](https://thaydds.github.io/volley-web-app/)
 
-**Backend ativado em10/11/2026:** migration de ciclo de partidas aplicada, Edge Function `volley-api` versão7 publicada e autorização de desativação configurada. O banco preservou os4 jogadores existentes. Esta branch usa um pacote de revisão do novo Counter, com commit/SHA256 em vendor/counter-review.json e integridade no lockfile. Substituir pela release publicada/aprovada do DS antes de merge/deploy; tokens0.1.1 preservados.
+**Backend ativado em10/11/2026:** migration de ciclo de partidas aplicada, Edge Function `volley-api` versão7 publicada e autorização de desativação configurada. O banco preservou os4 jogadores existentes. O app usa components0.8.0, que traz o Counter final e a composição em linhas; tokens0.1.1 preservados.
 
 ## Fluxo
 
@@ -50,4 +50,4 @@ Decisão desta implementação: acompanhamento somente em memória da sessão ab
 
 A API/banco não mudam nesta PR. A rota save_score continua para compatibilidade e recuperação de envios anteriores. Se um cliente antigo alterar a versão, a sessão preserva seu acompanhamento e exige revisão explícita antes de finalizar. Persistir o provisório entre recarregamentos ou sincronizá-lo exige decisão posterior; não foi assumido aqui.
 
-Dependência: PR26 do DS. Artefato vendor é somente para revisão reproduzível, não uma publicação npm. Adoção em produção requer a versão publicada aprovada e nova validação com essa dependência. Sem merge, release ou deploy nesta entrega.
+Dependência: components0.8.0 publicada (PR26 do DS), fixada no lockfile. O artefato de revisão foi removido e a suíte foi revalidada contra a release publicada. Sem merge ou deploy nesta entrega.

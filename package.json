@@ -20,7 +20,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@beachsports/components": "file:vendor/beachsports-components-0.7.0-review.counter.f86d6b84.tgz",
+    "@beachsports/components": "0.8.0",
     "@beachsports/tokens": "0.1.1",
     "@dnd-kit/dom": "0.5.0",
     "@dnd-kit/react": "^0.5.0",

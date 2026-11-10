@@ -1,8 +1,0 @@
-{
-  "source": "https://github.com/thaydds/Beach-Sports-DS",
-  "commit": "f86d6b8426e7c988d9833603c0e36e0980f2afca",
-  "file": "beachsports-components-0.7.0-review.counter.f86d6b84.tgz",
-  "version": "0.7.0-review.counter.f86d6b84",
-  "sha256": "253fb3e7212fd96ec3d9269eda200aef60f96dda2fa75b32965edaedd815819a",
-  "purpose": "Review only. Replace with approved published DS version before merge/deploy."
-}
