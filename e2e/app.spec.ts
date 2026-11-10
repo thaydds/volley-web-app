@@ -14,7 +14,7 @@ for (const theme of ['light', 'dark'] as const) {
       await info.attach(`${name}-${theme}`, { path, contentType: 'image/png' });
     };
     await capture('home');
-    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
     await capture('presence');
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.getByRole('button', { name: 'Voltar', exact: true }).click();
@@ -44,11 +44,11 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('draw-team-b').locator(`[data-player-id="${id}"]`)).toBeVisible();
     await page.getByRole('button', { name: 'Iniciar partida', exact: true }).click();
-    const input = page.getByRole('textbox', { name: 'Placar Time A', exact: true });
+    const input = page.getByRole('spinbutton', { name: 'Placar Time A', exact: true });
     await expect(input).toBeVisible();
-    for (const root of await page.locator('[data-input]').all()) {
-      await expect(root).toHaveCSS('width', '56px');
-      await expect(root).toHaveCSS('height', '56px');
+    for (const root of await page.locator('[data-counter]').all()) {
+      await expect(root).toHaveCSS('width', '158px');
+      await expect(root).toHaveCSS('height', '106px');
     }
     await expect(
       page.getByRole('button', { name: 'Finalizar partida', exact: true })
@@ -66,7 +66,7 @@ for (const theme of ['light', 'dark'] as const) {
       page.getByRole('button', { name: 'Finalizar partida', exact: true })
     ).toBeDisabled();
     await score(page, '21', '18');
-    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Salvar placar', exact: true })).toHaveCount(0);
     expect((await backend.matches()).length).toBe(0);
     await expect(
       page.getByRole('button', { name: 'Finalizar partida', exact: true })
@@ -128,7 +128,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
     await backend.command('finish_match', { id: gameId, version: 1, score_a: 21, score_b: 18 });
     await synchronized(page);
-    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
     const andre = page.getByRole('button', { name: 'André', exact: true });
     await andre.click();
     await page.getByRole('button', { name: 'Desativar André', exact: true }).click();
@@ -168,7 +168,7 @@ test('deactivation fails closed until server authorization is configured', async
 }) => {
   await seed(page, backend);
   await backend.authorizationConfigured(false);
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await page.getByRole('button', { name: 'Desativar André' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Palavra-chave de autorização').fill('explicit-test-only-phrase');
@@ -243,7 +243,7 @@ for (const theme of ['light', 'dark'] as const) {
     backend,
   }) => {
     await seed(page, backend, ['André', 'Lana', 'Andressa'], theme);
-    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
     const chip = page.getByRole('button', { name: 'André', exact: true });
     const before = await chip.locator('..').boundingBox();
     await chip.click();
@@ -266,7 +266,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Lana', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Sortear times', exact: true })).toBeEnabled();
     await page.reload();
-    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: 'Lana', exact: true })).toHaveAttribute(
       'aria-pressed',

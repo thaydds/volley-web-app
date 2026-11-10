@@ -26,7 +26,7 @@ export async function seed(
   return players;
 }
 export async function prepare(page: Page, names = ['André', 'Lana']) {
-  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   for (const name of names) {
     const chip = page.getByRole('button', { name, exact: true });
     if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
@@ -37,11 +37,11 @@ export async function prepare(page: Page, names = ['André', 'Lana']) {
 export async function start(page: Page, names = ['André', 'Lana']) {
   await prepare(page, names);
   await page.getByRole('button', { name: 'Iniciar partida', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Placar Time A', exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Placar Time A', exact: true })).toBeVisible();
 }
 export async function score(page: Page, a = '21', b = '18') {
-  await page.getByRole('textbox', { name: 'Placar Time A', exact: true }).fill(a);
-  await page.getByRole('textbox', { name: 'Placar Time B', exact: true }).fill(b);
+  await page.getByRole('spinbutton', { name: 'Placar Time A', exact: true }).fill(a);
+  await page.getByRole('spinbutton', { name: 'Placar Time B', exact: true }).fill(b);
 }
 export async function finish(page: Page) {
   await page.getByRole('button', { name: 'Finalizar partida', exact: true }).click();

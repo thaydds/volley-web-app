@@ -1,125 +1,74 @@
-import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Badge, Button, Input, ScoreMatch, Typography } from '@beachsports/components';
-import { canFinish, parseScore, type Game } from './domain';
-import styles from './LifecycleApp.module.css';
+import { Badge, Button, Counter, ScoreMatch, Typography } from '@beachsports/components';
+import { canFinish, type Game } from './domain';
+import type { SessionScore } from './sessionScores';
 import { gameTitle, names } from './gameLabels';
+import styles from './LifecycleApp.module.css';
 export function MatchPanel({
   game,
   pending,
   onOpen,
-  onSave,
   onFinish,
   disabled = false,
   detail = false,
   readOnly = false,
   footer,
+  draft,
+  onDraftChange,
 }: {
   game: Game;
   pending: boolean;
   onOpen?: () => void;
-  onSave: (a: number, b: number) => Promise<boolean>;
   onFinish?: (a: number, b: number) => void;
   disabled?: boolean;
   detail?: boolean;
   readOnly?: boolean;
   footer?: HTMLElement | null;
+  draft: SessionScore;
+  onDraftChange: (patch: Partial<SessionScore>) => void;
 }) {
-  const [a, setA] = useState(game.score_a === null ? '' : String(game.score_a));
-  const [b, setB] = useState(game.score_b === null ? '' : String(game.score_b));
-  const [notice, setNotice] = useState('');
-  const [dirty, setDirty] = useState(false);
-  const [editingVersion, setEditingVersion] = useState(game.version);
-  useEffect(() => {
-    if (!dirty || game.status === 'finished') {
-      setA(game.score_a === null ? '' : String(game.score_a));
-      setB(game.score_b === null ? '' : String(game.score_b));
-      setEditingVersion(game.version);
-    }
-  }, [game.id, game.version, game.score_a, game.score_b, game.status, dirty]);
-  const obsolete = dirty && editingVersion !== game.version;
-  const aa = parseScore(a),
-    bb = parseScore(b);
-  const valid = aa !== null && bb !== null;
   const finished = game.status === 'finished';
-  const changed =
-    a !== (game.score_a === null ? '' : String(game.score_a)) ||
-    b !== (game.score_b === null ? '' : String(game.score_b));
-  const title = gameTitle(game);
-  const suffix = detail ? '' : ` · ${title}`;
+  const obsolete = draft.version !== game.version;
+  const valid =
+    draft.validA && draft.validB && draft.a >= 0 && draft.a <= 99 && draft.b >= 0 && draft.b <= 99;
+  const title = gameTitle(game),
+    suffix = detail ? '' : ` · ${title}`;
   const common = {
     title,
     metadata: game.played_on.split('-').reverse().join('/'),
     teamA: { name: 'Time A', score: game.score_a ?? '—', players: names(game, 'A') },
     teamB: { name: 'Time B', score: game.score_b ?? '—', players: names(game, 'B') },
-    description: readOnly
-      ? 'Histórico arquivado anterior · somente consulta.'
-      : 'Partida em andamento',
   };
-  const inputs = {
+  const counters = {
     A: (
-      <Input
-        className={styles.scoreInput}
-        aria-label={`Placar Time A${suffix}`}
-        inputMode="numeric"
-        maxLength={10}
-        value={a}
+      <Counter
+        label={`Placar Time A${suffix}`}
+        digits={2}
+        value={draft.a}
         disabled={disabled}
-        validation={a && !Number.isInteger(aa) ? 'error' : 'none'}
-        onChange={(e) => {
-          if (!dirty) setEditingVersion(game.version);
-          setDirty(true);
-          setA(e.target.value);
-          setNotice('');
-        }}
+        onChange={(a) => onDraftChange({ a })}
+        onValidityChange={(validA) => onDraftChange({ validA })}
       />
     ),
     B: (
-      <Input
-        className={styles.scoreInput}
-        aria-label={`Placar Time B${suffix}`}
-        inputMode="numeric"
-        maxLength={10}
-        value={b}
+      <Counter
+        label={`Placar Time B${suffix}`}
+        digits={2}
+        value={draft.b}
         disabled={disabled}
-        validation={b && !Number.isInteger(bb) ? 'error' : 'none'}
-        onChange={(e) => {
-          if (!dirty) setEditingVersion(game.version);
-          setDirty(true);
-          setB(e.target.value);
-          setNotice('');
-        }}
+        onChange={(b) => onDraftChange({ b })}
+        onValidityChange={(validB) => onDraftChange({ validB })}
       />
     ),
   };
-  async function save() {
-    if (!valid || disabled || obsolete) return;
-    const ok = await onSave(aa, bb);
-    if (ok) {
-      setDirty(false);
-      setNotice('Placar salvo neste aparelho. Sincronize na Home para compartilhar.');
-    }
-  }
   const actions = (
-    <div className={styles.stack}>
-      <Button
-        className={styles.full}
-        variant="secondary"
-        disabled={!valid || disabled || obsolete || !changed}
-        onClick={() => void save()}
-      >
-        Salvar placar
-      </Button>
-      <Button
-        className={styles.full}
-        disabled={!canFinish(aa, bb) || disabled || obsolete}
-        onClick={() => {
-          if (aa !== null && bb !== null) onFinish?.(aa, bb);
-        }}
-      >
-        Finalizar partida
-      </Button>
-    </div>
+    <Button
+      className={styles.full}
+      disabled={disabled || obsolete || !valid || !canFinish(draft.a, draft.b)}
+      onClick={() => onFinish?.(draft.a, draft.b)}
+    >
+      Finalizar partida
+    </Button>
   );
   return (
     <div className={styles.detail}>
@@ -129,7 +78,7 @@ export function MatchPanel({
           if (
             onOpen &&
             event.target instanceof Element &&
-            !event.target.closest('button,input,a,label,[data-input]')
+            !event.target.closest('button,input,a,label,[data-counter]')
           )
             onOpen();
         }}
@@ -140,19 +89,20 @@ export function MatchPanel({
             state="finished"
             statusLabel={pending ? 'Finalizada · sincronização pendente' : 'Finalizada'}
             winnerLabel={`Time ${game.winner} · Vencedor`}
-            description="Resultado confirmado · não é possível editar."
           >
             {game.legacy_result && game.score_a === null && (
               <Typography variant="text-s" tone="secondary">
-                Resultado anterior preservado. O placar não foi registrado.
+                Placar não registrado.
               </Typography>
             )}
           </ScoreMatch>
         ) : (
           <ScoreMatch
             {...common}
-            scoreContent={readOnly ? undefined : inputs}
-            statusLabel={readOnly ? 'Arquivada · registro anterior' : 'Em andamento'}
+            scoreLayout={readOnly ? 'columns' : 'rows'}
+            scoreContent={readOnly ? undefined : counters}
+            statusLabel={readOnly ? 'Arquivada' : 'Em andamento'}
+            description={readOnly ? 'Somente consulta' : 'Placar de acompanhamento'}
           />
         )}
         {onOpen && (
@@ -166,51 +116,33 @@ export function MatchPanel({
           {obsolete && (
             <div className={styles.stack}>
               <Typography role="alert">
-                O placar mudou em outra aba. Seu texto foi mantido; confira o resultado atual antes
-                de salvar.
+                Esta partida foi atualizada. Revise o placar antes de finalizar.
               </Typography>
-              <Button variant="secondary" onClick={() => setDirty(false)}>
-                Carregar placar atualizado
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  onDraftChange({
+                    version: game.version,
+                    a: game.score_a ?? 0,
+                    b: game.score_b ?? 0,
+                    validA: (game.score_a ?? 0) <= 99,
+                    validB: (game.score_b ?? 0) <= 99,
+                  })
+                }
+              >
+                Usar placar atual
               </Button>
             </div>
           )}
-          {(!!a || !!b) && !valid && (
-            <Typography variant="text-s" role="alert" className={styles.error}>
-              Preencha os dois placares com números inteiros de 0 a 2147483647.
-            </Typography>
-          )}
-          {valid && (
+          {valid && draft.a !== draft.b && (
             <Badge
               size="sm"
-              tone={aa === bb ? 'neutral' : 'success'}
-              label={
-                aa === bb
-                  ? 'Empate · ajuste antes de finalizar'
-                  : `Time ${aa > bb ? 'A' : 'B'} está vencendo`
-              }
+              tone="success"
+              label={`Time ${draft.a > draft.b ? 'A' : 'B'} está vencendo`}
             />
-          )}
-          {pending && (
-            <Typography variant="text-s" tone="secondary">
-              Alterações locais · sincronização pendente
-            </Typography>
-          )}
-          {!detail && changed && (
-            <Button
-              variant="secondary"
-              disabled={!valid || disabled || obsolete || !changed}
-              onClick={() => void save()}
-            >
-              Salvar placar · {title}
-            </Button>
           )}
           {detail && !game.deleted_at && (footer ? createPortal(actions, footer) : actions)}
         </>
-      )}
-      {notice && (
-        <Typography role="status" variant="text-s">
-          {notice}
-        </Typography>
       )}
     </div>
   );
