@@ -173,3 +173,49 @@
 .app-brand {
   padding-inline: var(--ds-space-18);
 }
+
+.plain-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.shared-app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.sync-banner {
+  flex: 0 0 auto;
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  overflow-wrap: anywhere;
+  max-height: 40dvh;
+  overflow: auto;
+}
+.shared-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.shared-content > .screen {
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+.import-choice {
+  display: flex;
+  gap: var(--ds-space-8);
+  align-items: flex-start;
+}
+.import-choice input {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.25rem;
+}
+.shared-app > .offline-banner {
+  position: static;
+  flex: 0 0 auto;
+}

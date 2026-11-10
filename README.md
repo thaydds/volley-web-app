@@ -10,8 +10,8 @@ PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publ
 - **Seleção:** Chip MD alterna presença; contador usa os dados reais. Campo de cadastro sempre visível, sem seção expansível.
 - **Times definidos:** sorteio, novo sorteio e movimentação por arraste. Alternativa por teclado/toque: selecionar jogador → Mover para Time A/B. A mudança é anunciada e o foco volta ao jogador.
 - **Vencedor:** finalizar registra a partida; confirmação escolhe A/B. Cancelar mantém o registro sem vencedor.
-- **Histórico e detalhes:** todas as partidas locais têm detalhe próprio, revanche e exclusão com confirmação. Placar ausente aparece como `—`.
-- **Ranking:** usa a regra já existente em `scoring.ts`: uma vitória soma um ponto; empates recebem a mesma posição. Participantes históricos continuam aparecendo.
+- **Histórico e detalhes:** as partidas compartilhadas têm detalhe, edição de resultado, revanche, exclusão recuperável e restauração. Placar ausente aparece como `—`.
+- **Ranking:** é derivado no banco por ID de jogador: uma vitória soma um ponto; empates recebem a mesma posição. Participantes históricos continuam aparecendo.
 - **Ajustes:** temas Light/Dark e fonte padrão, grande (125%) ou muito grande (150%), salvos no aparelho. “Como usar” abre o onboarding do Figma.
 
 ## Desenvolvimento
@@ -30,6 +30,7 @@ npm run lint
 npm run format:check
 npm run typecheck
 npm run test:coverage
+npm run test:backend
 npm run build
 npx playwright install chromium
 npm run test:e2e
@@ -39,7 +40,19 @@ Vitest verifica regras, armazenamento e interações. Playwright usa o build de 
 
 ## Dados e deploy
 
-Elenco e partidas continuam em `localStorage` (`volley-v1`), sem backend. Salvar presença preserva o histórico. Ajustes usam `volley-preferences-v1`. Os dados são específicos do aparelho/origem; limpar o armazenamento do navegador os remove.
+Jogadores, partidas e ranking usam a API do Supabase. A URL pública fica em
+`.env.production`; nenhuma chave de projeto vai para o navegador. Acesso automático,
+sem CAPTCHA, com tokens de sessão e permissões no banco. Presença e preferências
+continuam no aparelho. Há prévia para importar o `volley-v1` antigo, preservando
+a cópia original, e cache offline somente para consulta.
+
+**Acesso anônimo habilitado e API validada com clientes reais.** O merge publica
+a integração no GitHub Pages. Contrato, configuração, evidências e limites estão
+em [supabase/README.md](supabase/README.md).
+
+`npm run dev` sem VITE_VOLLEY_API_URL mantém a prévia local legada. O build de
+produção é configurado para a API. Os testes de navegador interceptam esse endpoint
+com handler e banco reais de teste, sem tocar no projeto remoto.
 
 CI valida PRs; o workflow Deploy publica `main` no GitHub Pages. A versão da biblioteca fica fixada no lockfile; releases do DS não atualizam o app automaticamente.
 

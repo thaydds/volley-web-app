@@ -10,10 +10,24 @@ interface HistoryScreenProps {
   onDelete: (number: number) => void;
   onRematch: (match: Match) => void;
   onBack: () => void;
+  readOnly?: boolean;
+  archivedMatches?: Match[];
+  onRestore?: (match: Match) => void;
+  onEditWinner?: (match: Match) => void;
 }
-export function HistoryScreen({ matches, onDelete, onRematch, onBack }: HistoryScreenProps) {
+export function HistoryScreen({
+  matches,
+  onDelete,
+  onRematch,
+  onBack,
+  readOnly = false,
+  archivedMatches = [],
+  onRestore,
+  onEditWinner,
+}: HistoryScreenProps) {
   const [openNumber, setOpenNumber] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Match | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const selected = matches.find((m) => m.number === openNumber);
   if (selected)
     return (
@@ -28,15 +42,26 @@ export function HistoryScreen({ matches, onDelete, onRematch, onBack }: HistoryS
               className="full-width"
               data-testid={`matches-rematch-${selected.number}`}
               onClick={() => onRematch(selected)}
+              disabled={readOnly}
             >
               Revanche
             </Button>
+            {onEditWinner && (
+              <Button
+                variant="secondary"
+                disabled={readOnly}
+                onClick={() => onEditWinner(selected)}
+              >
+                Alterar resultado
+              </Button>
+            )}
             <Button
               variant="destructive"
               className="full-width"
               data-testid={`matches-delete-open-${selected.number}`}
               aria-label={`Excluir partida ${formatMatchNumber(selected.number)}`}
               onClick={() => setPendingDelete(selected)}
+              disabled={readOnly}
             >
               Excluir partida
             </Button>
@@ -102,6 +127,36 @@ export function HistoryScreen({ matches, onDelete, onRematch, onBack }: HistoryS
             </li>
           ))}
         </ul>
+      )}
+      {onRestore && archivedMatches.length > 0 && (
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => setShowArchived(!showArchived)}
+            aria-expanded={showArchived}
+          >
+            Partidas removidas ({archivedMatches.length})
+          </Button>
+          {showArchived && (
+            <ul className="stack plain-list">
+              {archivedMatches.map((match) => (
+                <li key={match.number}>
+                  <Typography>
+                    Partida {formatMatchNumber(match.number)} · {match.date}
+                  </Typography>
+                  <Button
+                    variant="secondary"
+                    disabled={readOnly}
+                    onClick={() => onRestore(match)}
+                    aria-label={`Restaurar partida ${formatMatchNumber(match.number)}`}
+                  >
+                    Restaurar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Screen>
   );

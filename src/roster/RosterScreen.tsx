@@ -6,13 +6,15 @@ import type { Player } from './types';
 interface PlayerChipProps {
   player: Player;
   onToggle: (name: string) => void;
+  disabled?: boolean;
 }
-export function PlayerChip({ player, onToggle }: PlayerChipProps) {
+export function PlayerChip({ player, onToggle, disabled }: PlayerChipProps) {
   return (
     <Chip
       label={player.name}
       size="md"
       selected={player.present}
+      disabled={disabled}
       onSelectedChange={() => onToggle(player.name)}
       data-testid="roster-player-chip"
     />
@@ -21,7 +23,8 @@ export function PlayerChip({ player, onToggle }: PlayerChipProps) {
 interface RosterScreenProps {
   players: Player[];
   notice: string | null;
-  onPlayersChange: (players: Player[]) => void;
+  onPlayersChange: (players: Player[]) => void | boolean | Promise<void | boolean>;
+  readOnly?: boolean;
   onDraw: () => void;
   onBack: () => void;
 }
@@ -31,6 +34,7 @@ export function RosterScreen({
   onPlayersChange,
   onDraw,
   onBack,
+  readOnly = false,
 }: RosterScreenProps) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +47,16 @@ export function RosterScreen({
     const result = addPlayer(players, draft);
     setError(result.ok ? null : result.error);
   }
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (readOnly) return;
     const result = addPlayer(players, draft);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    onPlayersChange(result.players);
+    const saved = await onPlayersChange(result.players);
+    if (saved === false) return;
     setDraft('');
     setError(null);
   }
@@ -71,7 +77,7 @@ export function RosterScreen({
           <Button
             size="lg"
             className="full-width"
-            disabled={presentCount < 2}
+            disabled={readOnly || presentCount < 2}
             data-testid="roster-draw-button"
             onClick={onDraw}
           >
@@ -97,6 +103,7 @@ export function RosterScreen({
             <li key={player.name}>
               <PlayerChip
                 player={player}
+                disabled={readOnly}
                 onToggle={(name) => onPlayersChange(togglePresence(players, name))}
               />
             </li>
@@ -111,33 +118,35 @@ export function RosterScreen({
         Preenchido: presente · Contorno: não marcado. Toque para alternar.
       </Typography>
       <form className="stack" onSubmit={handleSubmit} noValidate>
-        <FormField
-          label="Nome do jogador"
-          id="roster-name"
-          type="text"
-          value={draft}
-          maxLength={30}
-          placeholder="Ex.: Lana"
-          data-testid="roster-name-input"
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={handleBlur}
-          {...(error
-            ? { validation: 'error' as const, errorMessage: error }
-            : { validation: 'none' as const })}
-        />
-        {error && (
-          <Typography
-            className="visually-hidden"
-            variant="text-s"
-            role="alert"
-            data-testid="roster-error"
-          >
-            {error}
-          </Typography>
-        )}
-        <Button variant="secondary" type="submit" data-testid="roster-add-button">
-          Adicionar
-        </Button>
+        <fieldset className="stack plain-fieldset" disabled={readOnly}>
+          <FormField
+            label="Nome do jogador"
+            id="roster-name"
+            type="text"
+            value={draft}
+            maxLength={30}
+            placeholder="Ex.: Lana"
+            data-testid="roster-name-input"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={handleBlur}
+            {...(error
+              ? { validation: 'error' as const, errorMessage: error }
+              : { validation: 'none' as const })}
+          />
+          {error && (
+            <Typography
+              className="visually-hidden"
+              variant="text-s"
+              role="alert"
+              data-testid="roster-error"
+            >
+              {error}
+            </Typography>
+          )}
+          <Button variant="secondary" type="submit" data-testid="roster-add-button">
+            Adicionar
+          </Button>
+        </fieldset>
       </form>
     </Screen>
   );
