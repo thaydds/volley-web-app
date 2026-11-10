@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { LifecycleTransport } from '../../src/lifecycle/transport';
 import { VolleyClient, emptySnapshot, ApiError } from '../../src/shared/client';
 import { readLegacy, possibleDuplicate, importBatches, sourceId } from '../../src/shared/legacy';
 class MemoryStorage implements Storage {
@@ -218,4 +219,30 @@ describe('legacy preview and import batching', () => {
       batches.every((b) => new TextEncoder().encode(JSON.stringify(b)).byteLength < 32768)
     ).toBe(true);
   });
+});
+
+it('refuses to overwrite or filter away a corrupt legacy pending journal', () => {
+  const storage = new MemoryStorage();
+  const client = new LifecycleTransport(api, storage, vi.fn());
+  const key = 'volley-cloud-pending-v1:' + encodeURIComponent(api);
+  expect(() => client.assertLegacyJournalReadable()).not.toThrow();
+  for (const raw of [
+    'not-json',
+    '{}',
+    JSON.stringify([
+      { request_id: id, action: 'mutate', operation: 'create_player', input: { name: 'A' } },
+      { damaged: 'preserve' },
+    ]),
+  ]) {
+    storage.setItem(key, raw);
+    expect(() => client.assertLegacyJournalReadable()).toThrow('storage_corrupt');
+    expect(storage.getItem(key)).toBe(raw);
+  }
+  storage.setItem(
+    key,
+    JSON.stringify([
+      { request_id: id, action: 'mutate', operation: 'create_player', input: { name: 'A' } },
+    ])
+  );
+  expect(() => client.assertLegacyJournalReadable()).not.toThrow();
 });

@@ -1,325 +1,238 @@
-import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
-import { backendFor } from './support/backend';
 import AxeBuilder from '@axe-core/playwright';
-
-const names = [
-  'André',
-  'Andressa',
-  'Arrana',
-  'Erick',
-  'Gustavo',
-  'Iolanda',
-  'Lana',
-  'LL',
-  'Richard',
-  'Thay',
-  'Sabrina',
-  'Tigrinho',
-];
-async function seed(page: Page, theme: 'light' | 'dark') {
-  const players = await backendFor(page).seedPlayers(names);
-  await page.addInitScript(
-    ({ players, theme }) => {
-      if (!localStorage.getItem('e2e-seeded')) {
-        localStorage.setItem(
-          'volley-presence-v1:' +
-            encodeURIComponent('https://xejuimptprhvrjohhqyn.supabase.co/functions/v1/volley-api'),
-          JSON.stringify(Object.fromEntries(players.map((p, index) => [p.id, index < 10])))
-        );
-        localStorage.setItem(
-          'volley-preferences-v1',
-          JSON.stringify({ theme, fontSize: 'standard' })
-        );
-        localStorage.setItem('e2e-seeded', 'true');
-      }
-    },
-    { players, theme }
-  );
-  await page.goto('./');
-  await page.evaluate(() => document.fonts.ready);
-}
-async function audit(page: Page) {
-  await page.evaluate(async () => {
-    await Promise.all(
-      document.getAnimations().map((animation) => animation.finished.catch(() => {}))
-    );
-  });
-  const result = await new AxeBuilder({ page }).analyze();
-  expect(result.violations).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  const overflow = await page
-    .locator('.screen-content:visible')
-    .evaluateAll((nodes) => nodes.some((n) => n.scrollWidth > n.clientWidth + 1));
-  expect(overflow).toBe(false);
-}
-for (const theme of ['light', 'dark'] as const) {
-  test(`${theme}: seleção, movimento acessível, vencedor, histórico e persistência`, async ({
-    page,
-  }, testInfo) => {
-    await seed(page, theme);
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`home-${theme}.png`) });
-    await page.getByTestId('home-montar-time').click();
-    await expect(page.getByTestId('roster-present-count')).toContainText('10 presentes');
-    await page.getByRole('button', { name: 'Sabrina', exact: true }).click();
-    await expect(page.getByTestId('roster-present-count')).toContainText('11 presentes');
-    await page.getByRole('button', { name: 'Sabrina', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Sabrina', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`selection-${theme}.png`) });
-    await page.getByTestId('roster-draw-button').click();
-    const first = page.getByTestId('draw-team-a').getByTestId('draw-team-member').first();
-    const movedName = await first.getAttribute('data-player-name');
-    await first.getByRole('button').press('Space');
-    await page.getByRole('button', { name: 'Mover para Time B', exact: true }).click();
-    const moved = page.getByTestId('draw-team-b').locator(`[data-player-name="${movedName}"]`);
-    await expect(moved).toHaveCount(1);
-    await expect(moved.getByRole('button')).toBeFocused();
-    await expect(page.getByTestId('draw-team-member')).toHaveCount(10);
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`teams-${theme}.png`) });
-    await page.getByTestId('draw-confirm-button').click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByTestId('matches-winner-confirm-button')).toBeDisabled();
-    await page.getByTestId('matches-winner-a-button').click();
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`winner-${theme}.png`) });
-    await page.getByTestId('matches-winner-confirm-button').click();
-    await page.getByTestId('matches-card-1').click();
-    await expect(page.getByRole('heading', { name: 'Detalhes da partida' })).toBeVisible();
-    await expect(page.locator('[data-score-match]')).toContainText('—');
-    if (testInfo.project.name === 'mobile') {
-      const teams = page.locator('[data-score-match] [data-slot="team"]');
-      const first = await teams.first().boundingBox();
-      const second = await teams.last().boundingBox();
-      expect(second!.y).toBeCloseTo(first!.y, 1);
-      expect(second!.x).toBeGreaterThan(first!.x);
-    }
-
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`detail-${theme}.png`) });
-    await page.getByTestId('matches-delete-open-1').click();
-    await expect(page.getByTestId('matches-delete-cancel-button')).toBeFocused();
-    await audit(page);
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('matches-delete-open-1')).toBeFocused();
-    await page.getByRole('button', { name: 'Voltar', exact: true }).click();
-    await page.getByTestId('matches-history-back-button').click();
-    await page.getByTestId('home-montar-time').click();
-    await page.getByRole('button', { name: 'André', exact: true }).click();
-    await page.reload();
-    expect(
-      await page.evaluate(
-        () =>
-          JSON.parse(
-            localStorage.getItem(
-              Object.keys(localStorage).find((k) => k.startsWith('volley-cloud-cache-v1:'))!
-            )!
-          ).matches
-      )
-    ).toHaveLength(1);
-    await page.getByTestId('home-ranking-button').click();
-    await expect(page.getByRole('table')).toBeVisible();
-    if (testInfo.project.name === 'mobile') {
-      await expect(page.getByRole('columnheader').first()).toBeVisible();
-      await expect(page.locator('[data-ranking] tbody')).toHaveCSS('display', 'table-row-group');
-    }
-
-    await audit(page);
-    await page.screenshot({ path: testInfo.outputPath(`ranking-${theme}.png`) });
-  });
-  test(`${theme}: ajustes e onboarding acessíveis com fonte ampliada`, async ({
-    page,
-  }, testInfo) => {
-    await seed(page, theme);
-    await page.getByRole('button', { name: 'Ajustes' }).click();
-    await page.getByRole('button', { name: 'Muito grande', exact: true }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-font-size', 'extra-large');
-    await audit(page);
-    await page
-      .getByRole('button', { name: theme === 'light' ? 'Tema escuro' : 'Tema claro', exact: true })
-      .click();
-    await page.screenshot({ path: testInfo.outputPath(`settings-${theme}.png`) });
-    await page.reload();
-    await expect(page.locator('html')).toHaveAttribute(
-      'data-theme',
-      theme === 'light' ? 'dark' : 'light'
-    );
-    await expect(page.locator('html')).toHaveAttribute('data-font-size', 'extra-large');
-    await page.getByRole('button', { name: 'Ajustes' }).click();
-    await page.getByRole('button', { name: 'Como usar o Beach Sports' }).click();
-    await expect(page.getByRole('heading', { name: 'Seu vôlei, organizado.' })).toBeVisible();
-    await audit(page);
-    await page.getByRole('button', { name: 'Começar', exact: true }).click();
-    await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
-    await audit(page);
-  });
-}
-test('PWA recarrega offline com fonte e dados locais', async ({ page, context }) => {
-  await seed(page, 'light');
-  await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller)
-      await new Promise<void>((resolve) =>
-        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-          once: true,
-        })
-      );
-    return !!registration.active;
-  });
-  await context.setOffline(true);
-  await page.reload();
-  await expect(page.getByTestId('home-screen')).toBeVisible();
-  await expect(page.getByTestId('offline-banner')).toBeVisible();
-  await page.getByTestId('home-montar-time').click();
-  await expect(page.getByTestId('roster-present-count')).toContainText('10 presentes');
-  await context.setOffline(false);
-});
-
-test('arraste por ponteiro move apenas um jogador e mantém os demais', async ({
-  page,
-}, testInfo) => {
-  await seed(page, 'light');
-  await page.getByTestId('home-montar-time').click();
-  await page.getByTestId('roster-draw-button').click();
-  const source = page.getByTestId('draw-team-a').getByTestId('draw-team-member').first();
-  const name = await source.getAttribute('data-player-name');
-  const start = await source.getByRole('button').boundingBox();
-  const end = await page.getByTestId('draw-team-b').boundingBox();
-  if (!start || !end) throw new Error('Áreas de arraste ausentes');
-  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2 + 15, { steps: 3 });
-  await page.mouse.move(end.x + end.width / 2, end.y + 30, { steps: 20 });
-  await expect(page.getByTestId('draw-team-b')).toHaveAttribute('data-drop-target', 'true');
-  await page.screenshot({ path: testInfo.outputPath('drag-preview.png') });
-  await page.mouse.up();
-  await expect(page.getByTestId('draw-team-b').locator(`[data-player-name="${name}"]`)).toHaveCount(
-    1
-  );
-  await expect(page.getByTestId('draw-team-member')).toHaveCount(10);
-  await audit(page);
-});
-
-test('primeiro uso permite cadastrar vários jogadores e rejeita duplicata', async ({ page }) => {
-  await page.goto('./');
-  await page.getByTestId('home-montar-time').click();
-  const input = page.getByLabel('Nome do jogador');
-  await input.fill('Lana');
-  await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-  await expect(input).toBeVisible();
-  await input.fill('Bia');
-  await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-  await page.getByRole('button', { name: 'Lana', exact: true }).click();
-  await page.getByRole('button', { name: 'Bia', exact: true }).click();
-  await expect(page.getByTestId('roster-draw-button')).toBeEnabled();
-  await input.fill('Lana');
-  await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
-  await expect(input).toHaveAttribute('aria-invalid', 'true');
-  await expect(page.getByTestId('roster-player-chip')).toHaveCount(2);
-  await audit(page);
-});
-
-test('toque no Chip alterna presença sem iniciar arraste', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === 'desktop', 'Toque é verificado nos projetos móveis.');
-  await seed(page, 'light');
-  await page.getByTestId('home-montar-time').tap();
-  const player = page.getByRole('button', { name: 'Sabrina', exact: true });
-  await player.tap();
-  await expect(player).toHaveAttribute('aria-pressed', 'true');
-  await player.tap();
-  await expect(player).toHaveAttribute('aria-pressed', 'false');
-});
+import { expect, test } from './fixtures';
+import { seed, prepare, score, finish, home, synchronized } from './lifecycle.helpers';
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`${theme}: foco do Input e do Chip pertence ao contêiner inteiro`, async ({
+  test(`approved navigation, roster, pregame, scores and immutable result / ${theme}`, async ({
     page,
+    backend,
   }, info) => {
-    await seed(page, theme);
-    await page.getByTestId('home-montar-time').click();
-    const input = page.getByRole('textbox', { name: 'Nome do jogador' });
+    await seed(page, backend, ['André', 'Lana', 'Andressa', 'LL'], theme);
+    const capture = async (name: string) => {
+      const path = info.outputPath(`${name}-${theme}.png`);
+      await page.screenshot({ path, fullPage: true });
+      await info.attach(`${name}-${theme}`, { path, contentType: 'image/png' });
+    };
+    await capture('home');
+    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    await capture('presence');
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.getByRole('button', { name: 'Voltar', exact: true }).click();
+    const nav = page.getByRole('navigation', { name: 'Navegação principal' });
+    await expect(nav.getByRole('button')).toHaveText(['Ranking', 'Partidas', 'Ajustes']);
+    await expect(page.getByRole('button', { name: 'Cartas', exact: true })).toBeDisabled();
+    await expect(page.getByText('Beach Sports · v', { exact: false })).toBeVisible();
+    await prepare(page, ['André', 'Lana', 'Andressa', 'LL']);
+    await expect(page.getByText('Começa no saque', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Escolhe o lado', { exact: true })).toHaveCount(1);
+    await capture('pregame');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+    const a = page.getByTestId('draw-team-a');
+    const member = a.locator('[data-player-id]').first();
+    const id = await member.getAttribute('data-player-id');
+    const name = (await member.innerText()).trim();
+    const badge = a.locator('[data-badge]');
+    const title = a.getByRole('heading', { name: 'Time A' });
+    expect(Math.abs((await badge.boundingBox())!.y - (await title.boundingBox())!.y)).toBeLessThan(
+      10
+    );
+    await member.getByRole('button').focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: `Mover ${name} para Time B` }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('draw-team-b').locator(`[data-player-id="${id}"]`)).toBeVisible();
+    await page.getByRole('button', { name: 'Iniciar partida', exact: true }).click();
+    const input = page.getByRole('textbox', { name: 'Placar Time A', exact: true });
     await expect(input).toBeVisible();
-    await input.fill('Teste');
-    await expect(input).toHaveCSS('outline-style', 'none');
-    await expect(page.locator('[data-input]')).toHaveCSS('outline-width', '2px');
-    await page.screenshot({ path: info.outputPath(`input-focus-${theme}.png`) });
-    const chip = page
-      .locator('[data-chip]')
-      .filter({ has: page.getByRole('button', { name: 'Sabrina', exact: true }) });
-    const button = chip.getByRole('button', { name: 'Sabrina', exact: true });
-    await button.focus();
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Shift+Tab');
-    await expect(chip).toHaveCSS('outline-width', '2px');
-    await expect(button).toHaveCSS('outline-style', 'none');
-    await expect(button).toHaveCSS('-webkit-tap-highlight-color', 'rgba(0, 0, 0, 0)');
-    await page.keyboard.press('Space');
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
-    const actionColor = await chip.evaluate((node) =>
-      getComputedStyle(node).getPropertyValue('--ds-color-action-default').trim()
+    for (const root of await page.locator('[data-input]').all()) {
+      await expect(root).toHaveCSS('width', '56px');
+      await expect(root).toHaveCSS('height', '56px');
+    }
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeDisabled();
+    await score(page, '-1', '3');
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeDisabled();
+    await score(page, '2.5', '3');
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeDisabled();
+    await score(page, '3', '3');
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeDisabled();
+    await score(page, '21', '18');
+    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    expect((await backend.matches()).length).toBe(0);
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeEnabled();
+    await capture('live');
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.getByRole('button', { name: 'Finalizar partida', exact: true }).click();
+    await capture('confirm');
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Finalizar partida', exact: true })
+    ).toBeFocused();
+    await finish(page);
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Finalizar partida', exact: true })).toHaveCount(
+      0
     );
-    await expect(chip).toHaveCSS(
-      'background-color',
-      await chip.evaluate((node, color) => {
-        const probe = document.createElement('span');
-        probe.style.color = color;
-        node.append(probe);
-        const result = getComputedStyle(probe).color;
-        probe.remove();
-        return result;
-      }, actionColor)
+    await expect(page.getByRole('button', { name: 'Revanche', exact: true })).toBeVisible();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
     );
-    await page.screenshot({ path: info.outputPath(`chip-focus-${theme}.png`) });
-    await audit(page);
+    await capture('finished');
+    await home(page);
+    await synchronized(page);
+    expect(await backend.matches()).toMatchObject([
+      { status: 'finished', score_a: 21, score_b: 18, winner: 'A' },
+    ]);
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Partidas', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Finalizadas', exact: true }).click();
+    await page.getByRole('button', { name: /Abrir Partida/ }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('heading', { name: 'Partida finalizada', exact: true })
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Revanche', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Times definidos' })).toBeVisible();
+    expect((await backend.matches()).length).toBe(1);
+  });
+  test(`deactivation is separate from presence; authorization and reactivation preserve identity / ${theme}`, async ({
+    page,
+    backend,
+  }) => {
+    const players = await seed(page, backend, ['André', 'Lana'], theme);
+    const gameId = crypto.randomUUID();
+    await backend.command('start_match', {
+      id: gameId,
+      played_on: '2026-11-10',
+      serving_side: 'A',
+      participants: [
+        { player_id: players[0].id, side: 'A' },
+        { player_id: players[1].id, side: 'B' },
+      ],
+    });
+    await backend.command('finish_match', { id: gameId, version: 1, score_a: 21, score_b: 18 });
+    await synchronized(page);
+    await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+    const andre = page.getByRole('button', { name: 'André', exact: true });
+    await andre.click();
+    await page.getByRole('button', { name: 'Desativar André', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(andre).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByLabel('Palavra-chave de autorização').fill('wrong-test-word');
+    await dialog.getByRole('button', { name: 'Desativar jogador' }).click();
+    await expect(dialog.getByText('Palavra-chave incorreta.', { exact: false })).toBeVisible();
+    await dialog.getByLabel('Palavra-chave de autorização').fill(backend.testAuthorizationWord);
+    await dialog.getByRole('button', { name: 'Desativar jogador' }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(andre).toHaveCount(0);
+    await page.getByLabel('Nome do jogador').fill('  aNdRé  ');
+    await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Reativar André?' })).toBeVisible();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Reativar jogador', exact: true })
+      .click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(andre).toBeVisible();
+    await home(page);
+    await synchronized(page);
+    const restored = (await backend.players()).find((p) => p.name === 'André');
+    expect(restored).toMatchObject({ id: players[0].id, deleted_at: null, version: 3 });
+    expect((await backend.matches())[0]).toMatchObject({
+      id: gameId,
+      status: 'finished',
+      score_a: 21,
+    });
   });
 }
 
-test('laterais e extremos do Chip alternam e persistem sem reset do app', async ({ page }) => {
-  await seed(page, 'light');
-  await page.getByTestId('home-montar-time').click();
-  const chip = page
-    .locator('[data-chip]')
-    .filter({ has: page.getByRole('button', { name: 'Sabrina', exact: true }) });
-  const button = chip.getByRole('button');
-  const box = await chip.boundingBox();
-  if (!box) throw new Error('Chip não renderizado');
-  const positions = [
-    { x: 5, y: box.height / 2 },
-    { x: box.width - 5, y: box.height / 2 },
-    { x: box.width / 2, y: 3 },
-    { x: box.width / 2, y: box.height - 3 },
-  ];
-  for (const [index, position] of positions.entries()) {
-    await chip.click({ position });
-    const selected = index % 2 === 0;
-    await expect(button).toHaveAttribute('aria-pressed', String(selected));
-    expect(
-      await page.evaluate(() =>
-        (() => {
-          const cache = JSON.parse(
-            localStorage.getItem(
-              Object.keys(localStorage).find((k) => k.startsWith('volley-cloud-cache-v1:'))!
-            )!
-          );
-          const p = cache.players.find((p: { id: string; name: string }) => p.name === 'Sabrina');
-          return JSON.parse(
-            localStorage.getItem(
-              Object.keys(localStorage).find((k) => k.startsWith('volley-presence-v1:'))!
-            )!
-          )[p.id];
-        })()
-      )
-    ).toBe(selected);
+test('deactivation fails closed until server authorization is configured', async ({
+  page,
+  backend,
+}) => {
+  await seed(page, backend);
+  await backend.authorizationConfigured(false);
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Desativar André' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Palavra-chave de autorização').fill('explicit-test-only-phrase');
+  await dialog.getByRole('button', { name: 'Desativar jogador' }).click();
+  await expect(
+    dialog.getByText('A autorização de desativação ainda não foi configurada no serviço.')
+  ).toBeVisible();
+  expect((await backend.players()).every((p) => p.deleted_at === null)).toBe(true);
+});
+
+test('initial loading is only a spinner, failures retry and settings keep preferences', async ({
+  page,
+  backend,
+}) => {
+  let release!: () => void;
+  backend.readGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  backend.failReads = false;
+  try {
+    await page.goto('./');
+    const loading = page.getByRole('main', { name: 'Carregamento' });
+    await expect(loading).toHaveAttribute('aria-busy', 'true');
+    await expect(loading).toHaveText('');
+    await expect(
+      loading.getByRole('status', { name: 'Carregando jogadores e partidas' })
+    ).toBeVisible();
+    backend.failReads = true;
+  } finally {
+    release();
+    backend.readGate = null;
   }
-  await expect(button).toHaveCSS('-webkit-tap-highlight-color', 'rgba(0, 0, 0, 0)');
-  await page.reload();
-  await page.getByTestId('home-montar-time').click();
-  await expect(page.getByRole('button', { name: 'Sabrina', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'false'
+  await expect(page.getByRole('heading', { name: 'Não foi possível carregar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
+  backend.failReads = false;
+  await page.getByRole('button', { name: 'Tentar novamente' }).click();
+  await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+  await page.getByRole('navigation').getByRole('button', { name: 'Ajustes' }).click();
+  await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible();
+});
+
+test('pregame pointer drag moves the real DS chip without starting or changing a match', async ({
+  page,
+  backend,
+}, info) => {
+  test.skip(
+    info.project.name !== 'desktop',
+    'Native pointer drag; keyboard alternative is checked in all layouts.'
   );
+  await seed(page, backend, ['André', 'Lana', 'Andressa', 'LL']);
+  await prepare(page, ['André', 'Lana', 'Andressa', 'LL']);
+  const source = page.getByTestId('draw-team-a').locator('[data-player-id]').first();
+  const id = await source.getAttribute('data-player-id');
+  const button = await source.getByRole('button').boundingBox();
+  const target = await page.getByTestId('draw-team-b').boundingBox();
+  await page.mouse.move(button!.x + button!.width / 2, button!.y + button!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(button!.x + button!.width / 2 + 12, button!.y + button!.height / 2, {
+    steps: 3,
+  });
+  await page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2, {
+    steps: 25,
+  });
+  await page.mouse.up();
+  await expect(page.getByTestId('draw-team-b').locator(`[data-player-id="${id}"]`)).toBeVisible();
+  expect(await backend.matches()).toEqual([]);
 });

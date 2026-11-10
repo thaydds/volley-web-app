@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button, Card, Chip, Typography } from '@beachsports/components';
 import { Screen } from '../components/Screen';
 import type { Preferences, FontSize, Theme } from './preferences';
@@ -6,8 +7,9 @@ interface Props {
   onChange: (p: Preferences) => void;
   onBack: () => void;
   onHelp: () => void;
+  children?: ReactNode;
 }
-export function SettingsScreen({ preferences, onChange, onBack, onHelp }: Props) {
+export function SettingsScreen({ preferences, onChange, onBack, onHelp, children }: Props) {
   return (
     <Screen title="Configurações" badge="Ajustes" onBack={onBack}>
       <Typography as="h2" variant="heading-l">
@@ -51,6 +53,7 @@ export function SettingsScreen({ preferences, onChange, onBack, onHelp }: Props)
       <Button variant="ghost" onClick={onHelp}>
         Como usar o Beach Sports
       </Button>
+      {children}
     </Screen>
   );
 }

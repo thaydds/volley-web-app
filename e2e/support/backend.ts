@@ -9,6 +9,9 @@ export class Backend {
   private pending = new Set<Promise<void>>();
   private actor = crypto.randomUUID();
   private calls = 0;
+  readonly testAuthorizationWord = 'test-only-browser-authorization';
+  readGate: Promise<void> | null = null;
+  writeGate: Promise<void> | null = null;
   failReads = false;
   dropNextWrite = false;
   private handler = createHandler(
@@ -46,19 +49,41 @@ export class Backend {
             JSON.stringify({ sub: actor }),
           ]);
           await tx.exec('set local role authenticated');
-          if (url.endsWith('/volley_read'))
+          if (url.endsWith('/volley_read') || url.endsWith('/volley_read_lifecycle'))
             return (
-              await tx.query<{ result: unknown }>('select public.volley_read($1,$2,$3) as result', [
-                body.p_kind,
-                body.p_limit,
-                body.p_offset,
-              ])
+              await tx.query<{ result: unknown }>(
+                url.endsWith('/volley_read_lifecycle')
+                  ? 'select public.volley_read_lifecycle($1,$2,$3) as result'
+                  : 'select public.volley_read($1,$2,$3) as result',
+                [body.p_kind, body.p_limit, body.p_offset]
+              )
             ).rows[0].result;
           if (url.endsWith('/volley_import'))
             return (
               await tx.query<{ result: unknown }>(
                 'select public.volley_import($1::uuid,$2::jsonb) as result',
                 [body.p_request_id, JSON.stringify(body.p_input)]
+              )
+            ).rows[0].result;
+          if (url.endsWith('/volley_command'))
+            return (
+              await tx.query<{ result: unknown }>(
+                'select public.volley_command($1,$2::uuid,$3::jsonb) result',
+                [body.p_operation, body.p_request_id, JSON.stringify(body.p_input)]
+              )
+            ).rows[0].result;
+          if (url.endsWith('/volley_deactivate_player'))
+            return (
+              await tx.query<{ result: unknown }>(
+                'select public.volley_deactivate_player($1::uuid,$2::jsonb,$3) result',
+                [body.p_request_id, JSON.stringify(body.p_input), body.p_authorization_word]
+              )
+            ).rows[0].result;
+          if (url.endsWith('/volley_recover_receipt'))
+            return (
+              await tx.query<{ result: unknown }>(
+                'select public.volley_recover_receipt($1::uuid,$2,$3::jsonb) result',
+                [body.p_request_id, body.p_operation, JSON.stringify(body.p_input)]
               )
             ).rows[0].result;
           if (url.endsWith('/volley_mutate'))
@@ -92,6 +117,10 @@ export class Backend {
     for (const name of readdirSync('supabase/migrations').sort())
       if (name.endsWith('.sql'))
         await this.db.exec(`begin;${readFileSync(`supabase/migrations/${name}`, 'utf8')}commit;`);
+    // Explicitly test-only authorization; no production default exists.
+    await this.db.query('select private.configure_deactivation_secret($1)', [
+      this.testAuthorizationWord,
+    ]);
   }
   async seedPlayers(names: string[]) {
     return this.db.transaction(async (tx) => {
@@ -121,7 +150,14 @@ export class Backend {
   async route(context: BrowserContext) {
     await context.route(`${apiUrl}/**`, (route) => {
       const operation = (async () => {
-        if (this.failReads && route.request().url().endsWith('/read')) {
+        const request = route.request();
+        if (request.url().endsWith('/state')) await this.readGate;
+        if (request.url().endsWith('/command')) await this.writeGate;
+
+        if (
+          this.failReads &&
+          (route.request().url().endsWith('/read') || route.request().url().endsWith('/state'))
+        ) {
           await route.fulfill({
             status: 502,
             contentType: 'application/json',
@@ -130,7 +166,6 @@ export class Backend {
           });
           return;
         }
-        const request = route.request();
         const response = await this.handler(
           new Request(request.url(), {
             method: request.method(),
@@ -138,7 +173,13 @@ export class Backend {
             ...(request.method() === 'POST' ? { body: request.postData() ?? '{}' } : {}),
           })
         );
-        if (this.dropNextWrite && request.url().endsWith('/mutate') && response.ok) {
+        if (
+          this.dropNextWrite &&
+          (request.url().endsWith('/mutate') ||
+            request.url().endsWith('/command') ||
+            request.url().endsWith('/deactivate')) &&
+          response.ok
+        ) {
           this.dropNextWrite = false;
           await route.abort('failed');
           return;
@@ -153,6 +194,55 @@ export class Backend {
       void operation.finally(() => this.pending.delete(operation)).catch(() => {});
       return operation;
     });
+  }
+  async mutate(operation: string, input: Record<string, unknown>, requestId: string) {
+    return this.db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [this.actor]);
+      await tx.exec('set local role authenticated');
+      return (
+        await tx.query<{ result: Record<string, unknown> }>(
+          'select public.volley_mutate($1,$2::uuid,$3::jsonb) result',
+          [operation, requestId, JSON.stringify(input)]
+        )
+      ).rows[0].result;
+    });
+  }
+  async command(
+    operation: string,
+    input: Record<string, unknown>,
+    requestId = crypto.randomUUID()
+  ) {
+    return this.db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [this.actor]);
+      await tx.exec('set local role authenticated');
+      return (
+        await tx.query<{ result: Record<string, unknown> }>(
+          'select public.volley_command($1,$2::uuid,$3::jsonb) result',
+          [operation, requestId, JSON.stringify(input)]
+        )
+      ).rows[0].result;
+    });
+  }
+  async players() {
+    return (
+      await this.db.query<{ id: string; name: string; deleted_at: string | null; version: number }>(
+        'select id,name,deleted_at,version from private.players order by name'
+      )
+    ).rows;
+  }
+  async matches() {
+    return (
+      await this.db.query<Record<string, unknown>>(
+        'select id,number,status,score_a,score_b,winner,version,serving_side from private.matches order by number'
+      )
+    ).rows;
+  }
+  async authorizationConfigured(configured: boolean) {
+    if (!configured) await this.db.exec('delete from private.deactivation_policy');
+    else
+      await this.db.query('select private.configure_deactivation_secret($1)', [
+        this.testAuthorizationWord,
+      ]);
   }
   get sessionCount() {
     return this.calls;

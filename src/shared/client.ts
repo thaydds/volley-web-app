@@ -121,7 +121,7 @@ export class VolleyClient {
   private session: Session | null = null;
   readonly cacheKey: string;
   private sessionKey: string;
-  private pendingKey: string;
+  protected pendingKey: string;
   constructor(
     readonly url: string,
     readonly storage: Storage,
@@ -258,7 +258,7 @@ export class VolleyClient {
     this.session = await flight;
     return this.session;
   }
-  private async authenticated(action: string, body: unknown) {
+  protected async authenticated(action: string, body: unknown) {
     const session = await this.authenticate();
     try {
       return await this.post(action, body, session.access_token);

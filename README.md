@@ -1,29 +1,29 @@
 # Beach Sports · Volley Web App
 
-PWA React + TypeScript para organizar partidas de vôlei, usando os pacotes publicados **@beachsports/components 0.5.0** e **@beachsports/tokens 0.1.1**.
+PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartilhados via API e operações offline persistidas no aparelho.
 
-[Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [Biblioteca e documentação](https://thaydds.github.io/Beach-Sports-DS/) · [App publicado](https://thaydds.github.io/volley-web-app/)
+[Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) · [App publicado](https://thaydds.github.io/volley-web-app/)
+
+**Backend ativado em10/11/2026:** migration de ciclo de partidas aplicada, Edge Function `volley-api` versão7 publicada e autorização de desativação configurada. O banco preservou os4 jogadores existentes. O app usa components0.7.0 e tokens0.1.1; publicação do frontend depende do merge/deploy desta PR.
 
 ## Fluxo
 
-- **Início:** montar time, partidas, ranking e ajustes. Cartas fica indisponível porque ainda não tem fluxo definido.
-- **Seleção:** Chip MD alterna presença; contador usa os dados reais. Campo de cadastro sempre visível, sem seção expansível.
-- **Times definidos:** sorteio, novo sorteio e movimentação por arraste. Alternativa por teclado/toque: selecionar jogador → Mover para Time A/B. A mudança é anunciada e o foco volta ao jogador.
-- **Vencedor:** finalizar registra a partida; confirmação escolhe A/B. Cancelar mantém o registro sem vencedor.
-- **Histórico e detalhes:** as partidas compartilhadas têm detalhe, edição de resultado, revanche, exclusão recuperável e restauração. Placar ausente aparece como `—`.
-- **Ranking:** é derivado no banco por ID de jogador: uma vitória soma um ponto; empates recebem a mesma posição. Participantes históricos continuam aparecendo.
-- **Ajustes:** temas Light/Dark e fonte padrão, grande (125%) ou muito grande (150%), salvos no aparelho. “Como usar” abre o onboarding do Figma.
+- **Home:** spinner inicial sem texto visual, dados salvos, última sincronização e botão Sincronizar. Ranking / Partidas / Ajustes permanecem no menu inferior; Cartas está desabilitado. O rodapé usa versão do pacote e revisão real do build.
+- **Quem veio hoje:** chips de largura natural, marca de seleção, cadastro na mesma tela. O × abre desativação, independentemente da presença. Desativar exige conexão e palavra-chave validada pelo servidor; não apaga histórico. Nome igual normalizado oferece reativação explícita da identidade anterior, sem mesclar homônimos silenciosamente.
+- **Pré-jogo:** sorteio, arraste ou seleção → Mover, novo sorteio e Iniciar partida. Cada time recebe um dos papéis complementares Começa no saque / Escolhe o lado. Times e atribuições ficam congelados após iniciar.
+- **Partidas:** abas Em andamento / Finalizadas. Os dois inputs DS de 56×56 ficam nas colunas do ScoreMatch. Salvar aceita inteiros não negativos; finalizar exige dois placares distintos, confirmação e vencedor calculado pelo servidor.
+- **Finalizadas:** somente consulta, inclusive offline; sem editar ou excluir. Revanche prepara outra partida e preserva a anterior. Resultados antigos sem placar continuam com vencedor e `—`, sem pontos inventados.
+- **Offline:** com cache, permite cadastrar, preparar, iniciar, salvar placar e finalizar. Cada ação só é confirmada após persistência no IndexedDB. Sincronizar envia a fila em ordem e consulta a base; reconectar não envia automaticamente. Conflitos e respostas incertas preservam a fila até recuperação explícita. Desativação e importação são online.
+- **Ranking:** calculado por UUID a partir dos resultados disponíveis, incluindo projeção das finalizações locais pendentes. Uma vitória vale um ponto; histórico de desativados é preservado.
 
-## Desenvolvimento
+## Desenvolvimento e validação
 
 ```bash
 npm ci
 npm run dev
 ```
 
-O servidor usa a base `/volley-web-app/`. Estilos e tokens públicos são importados uma única vez em `src/main.tsx`. A fonte Inter fica hospedada localmente e entra no cache offline, com licença em `src/assets/Inter-LICENSE.txt`.
-
-## Validação
+A base é `/volley-web-app/`. Sem `VITE_VOLLEY_API_URL`, o servidor de desenvolvimento mantém a prévia local legada; produção sem URL mostra indisponibilidade. Configure uma API de desenvolvimento com origem permitida para trabalhar na integração. O build padrão contém somente a URL pública da API; não contém chaves Supabase.
 
 ```bash
 npm run lint
@@ -36,24 +36,8 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Vitest verifica regras, armazenamento e interações. Playwright usa o build de produção em 393px, 320px e desktop, com auditorias axe nos temas Light/Dark, reflow, preferências, movimento, foco e recarregamento offline. Evidências ficam em `test-results/`; relatório em `playwright-report/`.
+Os testes de navegador usam build de produção, handler real e migrations reais em PGlite, com Auth externo simulado; não acessam o projeto remoto. Cobrem 393px, 320px e desktop, Light/Dark, acessibilidade, offline/reload, dispositivos independentes, abas, idempotência, conflitos e falhas de armazenamento. Evidências: `test-results/` e `playwright-report/`.
 
-## Dados e deploy
+Tokens 0.1.1, CSS Modules e fonte Inter local continuam compartilhados; a fonte entra no cache offline. Preferências, presença e pré-jogo são locais. Backups anteriores `volley-v1` são preservados. [Contrato, segurança e recuperação](supabase/README.md) · [decisões de arquitetura](aidlc/spaces/default/intents/261110-offline-match-lifecycle/construction/architecture.md).
 
-Jogadores, partidas e ranking usam a API do Supabase. A URL pública fica em
-`.env.production`; nenhuma chave de projeto vai para o navegador. Acesso automático,
-sem CAPTCHA, com tokens de sessão e permissões no banco. Presença e preferências
-continuam no aparelho. Há prévia para importar o `volley-v1` antigo, preservando
-a cópia original, e cache offline somente para consulta.
-
-**Acesso anônimo habilitado e API validada com clientes reais.** O merge publica
-a integração no GitHub Pages. Contrato, configuração, evidências e limites estão
-em [supabase/README.md](supabase/README.md).
-
-`npm run dev` sem VITE_VOLLEY_API_URL mantém a prévia local legada. O build de
-produção é configurado para a API. Os testes de navegador interceptam esse endpoint
-com handler e banco reais de teste, sem tocar no projeto remoto.
-
-CI valida PRs; o workflow Deploy publica `main` no GitHub Pages. A versão da biblioteca fica fixada no lockfile; releases do DS não atualizam o app automaticamente.
-
-As decisões e lacunas do Figma estão em [docs/redesign.md](docs/redesign.md).
+CI valida PRs. O workflow de deploy existente publica `main` no GitHub Pages; esta entrega não fez merge, deploy, publicação npm nem alteração do Figma.

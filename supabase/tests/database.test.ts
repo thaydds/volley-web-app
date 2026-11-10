@@ -79,7 +79,9 @@ describe('private storage and fixed RPC contract', () => {
     expect((await read('players')).map((p) => p.name)).toContain("'; DROP TABLE players; --");
     await expect(mutation('create_player', { name: '   ' })).rejects.toThrow();
     await expect(mutation('create_player', { name: 'x'.repeat(31) })).rejects.toThrow();
-    await expect(mutation('create_player', { name: '__PROTO__' })).rejects.toThrow(/duplicate key/);
+    await expect(mutation('create_player', { name: '__PROTO__' })).rejects.toThrow(
+      /duplicate key|player_name_exists/
+    );
   });
   it('reads the verified JSON JWT claims without provider auth-schema privileges', async () => {
     await db.query("select set_config('request.jwt.claim.sub', '', false)");
@@ -129,17 +131,23 @@ describe('private storage and fixed RPC contract', () => {
     match = String(created.id);
     expect(created.number).toBe(1);
   });
-  it('validates winners and detects stale writes', async () => {
+  it('validates authoritative scores, blocks the deprecated winner route and detects stale writes', async () => {
     await expect(
-      mutation('set_match_winner', { id: match, version: 1, winner: 'C' })
-    ).rejects.toThrow(/invalid_winner/);
-    await expect(mutation('set_match_winner', { id: match, version: 1 })).rejects.toThrow(
-      /invalid_fields/
+      mutation('set_match_winner', { id: match, version: 1, winner: 'A' })
+    ).rejects.toThrow(/client_update_required/);
+    const command = (input: unknown) =>
+      db.query<{ result: { version: number } }>(
+        "select public.volley_command('finish_match',$1,$2) result",
+        [crypto.randomUUID(), JSON.stringify(input)]
+      );
+    await expect(command({ id: match, version: 1, score_a: 2, score_b: 2 })).rejects.toThrow(
+      /tied_score/
     );
-    const updated = await mutation('set_match_winner', { id: match, version: 1, winner: 'A' });
-    expect(updated.version).toBe(2);
+    expect(
+      (await command({ id: match, version: 1, score_a: 21, score_b: 18 })).rows[0].result.version
+    ).toBe(2);
     await expect(
-      mutation('set_match_winner', { id: match, version: 1, winner: 'B' })
+      command({ id: match, version: 1, score_a: 10, score_b: 21 })
     ).rejects.toMatchObject({ code: 'PT409', message: 'version_conflict' });
     expect((await read('ranking')).find((p) => p.id === a)?.points).toBe(1);
   });
@@ -148,15 +156,27 @@ describe('private storage and fixed RPC contract', () => {
     const matches = await read('matches');
     expect(JSON.stringify(matches)).toContain("'; DROP TABLE players; --");
     expect((await read('ranking')).find((p) => p.id === a)?.name).toBe('Renamed');
-    await mutation('archive_player', { id: a, version: 2 });
+    await db.exec('reset role');
+    await db.query('select private.configure_deactivation_secret($1)', [
+      'test-only-database-authorization',
+    ]);
+    await db.exec('set role authenticated');
+    await db.query('select public.volley_deactivate_player($1,$2,$3)', [
+      crypto.randomUUID(),
+      JSON.stringify({ id: a, version: 2 }),
+      'test-only-database-authorization',
+    ]);
     expect((await read('players')).some((p) => p.id === a)).toBe(false);
     expect((await read('ranking')).find((p) => p.id === a)?.points).toBe(1);
   });
-  it('recovers archived matches without losing results or identity', async () => {
-    await mutation('archive_match', { id: match, version: 2 });
-    expect(await read('matches')).toEqual([]);
-    expect((await read('ranking')).find((p) => p.id === b)?.losses).toBe(0);
-    await mutation('restore_match', { id: match, version: 3 });
+  it('does not archive or modify a finalized result and preserves statistics', async () => {
+    await expect(mutation('archive_match', { id: match, version: 2 })).rejects.toThrow(
+      /client_update_required/
+    );
+    await expect(mutation('restore_match', { id: match, version: 2 })).rejects.toThrow(
+      /client_update_required/
+    );
+    expect((await read('matches')).some((m) => m.id === match)).toBe(true);
     expect((await read('ranking')).find((p) => p.id === b)?.losses).toBe(1);
     await expect(
       db.query('select public.volley_read($1,$2,$3)', ['players', 201, 0])
@@ -167,7 +187,7 @@ describe('private storage and fixed RPC contract', () => {
     const audit = await db.query<{ count: number }>(
       'select count(*)::int as count from private.audit_events'
     );
-    expect(audit.rows[0].count).toBe(9);
+    expect(audit.rows[0].count).toBe(7);
     await db.query('update private.actor_limits set writes=60 where actor_id=$1', [actor]);
     await db.exec('set role authenticated');
     await expect(mutation('create_player', { name: 'Over quota' })).rejects.toThrow(/rate_limit/);

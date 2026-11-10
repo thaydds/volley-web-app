@@ -1,207 +1,426 @@
-import type { Page } from '@playwright/test';
-import { test, expect } from './fixtures';
+import { expect, test } from './fixtures';
+import {
+  seed,
+  start,
+  score,
+  finish,
+  home,
+  synchronized,
+  outbox,
+  apiUrl,
+} from './lifecycle.helpers';
 
-async function ready(page: Page) {
-  await expect(page.getByRole('status').filter({ hasText: 'Última atualização:' })).toBeVisible();
-}
-async function draw(page: Page) {
-  await page.getByTestId('home-montar-time').click();
-  await page.getByRole('button', { name: 'Ana', exact: true }).click();
-  await page.getByRole('button', { name: 'Bia', exact: true }).click();
-  await page.getByTestId('roster-draw-button').click();
-  await page.getByTestId('draw-confirm-button').click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-}
-async function finish(page: Page, side: 'a' | 'b' = 'a') {
-  await page.getByTestId(`matches-winner-${side}-button`).click();
-  await page.getByTestId('matches-winner-confirm-button').click();
-  await expect(page.getByTestId('matches-card-1')).toBeVisible();
-}
-
-test('dois navegadores compartilham partidas e ranking, mantendo presença e sessões separadas', async ({
-  page,
-  browser,
-  backend,
-}) => {
-  await backend.seedPlayers(['Ana', 'Bia']);
-  const other = await browser.newContext();
-  await backend.route(other);
-  const second = await other.newPage();
-  try {
-    await page.goto('./');
-    await ready(page);
-    await second.goto('http://127.0.0.1:4178/volley-web-app/');
-    await ready(second);
-    await second.getByTestId('home-history-button').click();
-    await expect(second.getByTestId('matches-history-empty')).toBeVisible();
-    await draw(page);
-    await finish(page);
-    await second.getByRole('button', { name: 'Atualizar dados', exact: true }).click();
-    await expect(second.getByTestId('matches-card-1')).toBeVisible();
-    await second.getByTestId('matches-history-back-button').click();
-    await second.getByTestId('home-ranking-button').click();
-    await expect(second.getByRole('table')).toContainText('Ana');
-    await expect(second.getByRole('table')).toContainText('1 vitórias');
-    await second.getByRole('button', { name: 'Voltar', exact: true }).click();
-    await second.getByTestId('home-montar-time').click();
-    await expect(second.getByTestId('roster-present-count')).toContainText('0 presentes');
-    expect(backend.sessionCount).toBe(2);
-  } finally {
-    await other.unrouteAll({ behavior: 'wait' });
-    await other.close();
-  }
-});
-
-test('cache offline permite consultar, bloqueia gravações e volta a atualizar ao reconectar', async ({
+test('offline create/start/score/finalize survive reload and sync dependencies without duplicates', async ({
   page,
   context,
   backend,
 }) => {
-  await backend.seedPlayers(['Ana', 'Bia']);
-  await page.goto('./');
-  await ready(page);
-  await draw(page);
-  await finish(page);
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller)
-      await new Promise<void>((resolve) =>
-        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-          once: true,
-        })
-      );
-  });
+  await seed(page, backend);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   await context.setOffline(true);
-  await page.reload();
-  await page.getByTestId('home-history-button').click();
-  await expect(page.getByTestId('matches-card-1')).toBeVisible();
-  await page.getByTestId('matches-card-1').click();
-  await expect(page.getByTestId('matches-delete-open-1')).toBeDisabled();
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByLabel('Nome do jogador').fill('Nova pessoa');
+  await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Nova pessoa', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Voltar', exact: true }).click();
-  await page.getByTestId('matches-history-back-button').click();
-  await page.getByTestId('home-montar-time').click();
-  await expect(page.getByTestId('roster-add-button')).toBeDisabled();
-  await context.setOffline(false);
-  await expect(page.getByTestId('roster-add-button')).toBeEnabled();
-});
-
-test('falha de consulta não vira histórico vazio e uma nova consulta recupera o app', async ({
-  page,
-  backend,
-}) => {
-  backend.failReads = true;
-  await page.goto('./');
-  await page.getByTestId('home-history-button').click();
-  await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByTestId('matches-history-empty')).toHaveCount(0);
-  backend.failReads = false;
-  await page.getByRole('button', { name: 'Atualizar dados', exact: true }).click();
-  await expect(page.getByTestId('matches-history-empty')).toBeVisible();
-});
-
-test('resposta perdida após salvar não duplica o registro ao recarregar e repetir o envio', async ({
-  page,
-  backend,
-}) => {
-  await page.goto('./');
-  await ready(page);
-  await page.getByTestId('home-montar-time').click();
-  await page.getByLabel('Nome do jogador').fill('Ana');
-  backend.dropNextWrite = true;
-  await page.getByTestId('roster-add-button').click();
-  await expect(page.getByRole('button', { name: 'Repetir envio pendente' })).toBeVisible();
+  await start(page, ['André', 'Lana', 'Nova pessoa']);
+  await score(page, '21', '18');
+  await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+  await finish(page);
+  const before = await outbox(page);
+  expect(before.queue.map((c) => (c as { operation?: string }).operation)).toEqual([
+    'create_player',
+    'start_match',
+    'save_score',
+    'finish_match',
+  ]);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Repetir envio pendente' })).toBeVisible();
-  await page.getByRole('button', { name: 'Repetir envio pendente' }).click();
-  await expect(page.getByRole('button', { name: 'Repetir envio pendente' })).toHaveCount(0);
-  await page.getByTestId('home-montar-time').click();
-  await expect(page.getByTestId('roster-player-chip')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Ana', exact: true })).toBeVisible();
-});
-
-test('prévia desmarca possível duplicata, importa a seleção e preserva o localStorage antigo', async ({
-  page,
-  backend,
-}) => {
-  await backend.seedLegacy({
-    source_id: crypto.randomUUID(),
-    players: ['Ana', 'Bia'],
-    matches: [
-      {
-        key: 'other-device',
-        played_on: '2026-11-01',
-        winner: 'A',
-        team_a: ['Ana'],
-        team_b: ['Bia'],
-      },
-    ],
-  });
-  const raw = JSON.stringify({
-    players: [
-      { name: 'Ana', present: true },
-      { name: 'Bia', present: true },
-    ],
-    matches: [
-      { number: 7, date: '01/11/2026', winner: 'A', teamA: ['Ana'], teamB: ['Bia'] },
-      { number: 8, date: '02/11/2026', winner: null, teamA: ['Ana'], teamB: ['Bia'] },
-    ],
-  });
-  await page.addInitScript((raw) => localStorage.setItem('volley-v1', raw), raw);
-  await page.goto('./');
-  await ready(page);
-  await page.getByRole('button', { name: 'Revisar histórico deste aparelho' }).click();
-  const duplicate = page.getByRole('checkbox', { name: /Partida local #7/ });
-  await expect(duplicate).not.toBeChecked();
-  await expect(page.getByRole('checkbox', { name: /Partida local #8/ })).toBeChecked();
-  await page.getByTestId('import-confirm').click();
-  await expect(page.getByTestId('import-dialog')).toHaveCount(0);
-  await page.getByTestId('home-history-button').click();
-  await expect(page.getByTestId('matches-history-list').getByRole('listitem')).toHaveCount(2);
-  expect(await page.evaluate(() => localStorage.getItem('volley-v1'))).toBe(raw);
-  await page.reload();
-  await expect(page.getByRole('button', { name: 'Revisar histórico deste aparelho' })).toHaveCount(
-    0
+  await expect(
+    page.getByRole('heading', { name: 'Partida finalizada', exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText('Finalizada · sincronização pendente', { exact: true })).toHaveCount(
+    2
   );
+  expect((await backend.matches()).length).toBe(0);
+  await context.setOffline(false);
+  await page.waitForTimeout(150);
+  expect((await backend.matches()).length).toBe(0);
+  await home(page);
+  await synchronized(page);
+  expect((await backend.matches()).length).toBe(1);
+  expect((await backend.players()).length).toBe(3);
+  expect((await outbox(page)).queue).toEqual([]);
 });
 
-test('exclusão é recuperável e uma edição concorrente não sobrescreve o outro navegador', async ({
+test('lost acknowledgement replays the identical operation after session recreation', async ({
+  page,
+  backend,
+}) => {
+  await seed(page, backend);
+  await start(page);
+  await score(page);
+  await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+  await finish(page);
+  await home(page);
+  const requests = (await outbox(page)).queue.map((c) => c.request_id);
+  backend.dropNextWrite = true;
+  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect((await backend.matches()).length).toBe(1);
+  expect((await outbox(page)).queue.map((c) => c.request_id)).toEqual(requests);
+  await page.evaluate(
+    (url) => localStorage.removeItem('volley-cloud-session-v1:' + encodeURIComponent(url)),
+    apiUrl
+  );
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+  await synchronized(page);
+  expect((await backend.matches()).length).toBe(1);
+  expect((await backend.matches())[0]).toMatchObject({ status: 'finished', score_a: 21 });
+  expect((await outbox(page)).queue).toEqual([]);
+});
+
+test('two independent devices retain a conflict until explicit review, never overwrite another score', async ({
   page,
   browser,
   backend,
+  baseURL,
 }) => {
-  await backend.seedPlayers(['Ana', 'Bia']);
-  await page.goto('./');
-  await ready(page);
-  await draw(page);
-  await finish(page);
-  const context = await browser.newContext();
-  await backend.route(context);
-  const second = await context.newPage();
+  await seed(page, backend);
+  await start(page);
+  await home(page);
+  await synchronized(page);
+  const other = await browser.newContext({ baseURL, serviceWorkers: 'block' });
+  await backend.route(other);
+  const second = await other.newPage();
   try {
-    await second.goto('http://127.0.0.1:4178/volley-web-app/');
-    await ready(second);
-    await second.getByTestId('home-history-button').click();
-    await page.getByTestId('matches-card-1').click();
-    await second.getByTestId('matches-card-1').click();
-    await page.getByRole('button', { name: 'Alterar resultado' }).click();
-    await second.getByRole('button', { name: 'Alterar resultado' }).click();
-    await page.getByTestId('matches-winner-b-button').click();
-    await page.getByTestId('matches-winner-confirm-button').click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-    await second.getByTestId('matches-winner-a-button').click();
-    await second.getByTestId('matches-winner-confirm-button').click();
-    await expect(second.getByRole('alert')).toContainText('mudaram em outro dispositivo');
+    await second.goto('./');
+    await expect(second.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+    for (const p of [page, second]) {
+      await p
+        .getByRole('navigation')
+        .getByRole('button', { name: 'Partidas', exact: true })
+        .click();
+      await p.getByRole('button', { name: /Abrir Partida/ }).focus();
+      await p.keyboard.press('Enter');
+      await expect(p.getByRole('textbox', { name: 'Placar Time A', exact: true })).toBeVisible();
+    }
+    await score(page, '21', '18');
+    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await home(page);
+    await synchronized(page);
+    await score(second, '25', '19');
+    await second.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await home(second);
+    await second.getByRole('button', { name: 'Sincronizar', exact: true }).click();
+    await expect(second.getByRole('button', { name: 'Revisar conflito' })).toBeVisible();
+    expect((await outbox(second)).queue).toHaveLength(1);
+    expect((await backend.matches())[0]).toMatchObject({ score_a: 21, score_b: 18 });
+    await second.reload();
+    await expect(second.getByRole('button', { name: 'Revisar conflito' })).toBeVisible();
+    await second.getByRole('button', { name: 'Revisar conflito' }).click();
+    await second
+      .getByRole('dialog')
+      .getByRole('button', { name: /Usar servidor e descartar 1/ })
+      .click();
     await expect(second.getByRole('dialog')).toHaveCount(0);
-    await second.getByRole('button', { name: 'Voltar', exact: true }).click();
-    await expect(second.getByTestId('matches-winner-badge-1')).toContainText('Time B');
-    await page.getByTestId('matches-delete-open-1').click();
-    await page.getByTestId('matches-delete-confirm-button').click();
-    await expect(page.getByTestId('matches-history-empty')).toBeVisible();
-    await page.getByRole('button', { name: 'Partidas removidas (1)' }).click();
-    await page.getByRole('button', { name: 'Restaurar partida #001' }).click();
-    await expect(page.getByTestId('matches-card-1')).toBeVisible();
+    expect((await outbox(second)).queue).toHaveLength(0);
+    expect((await backend.matches())[0]).toMatchObject({ score_a: 21, score_b: 18 });
   } finally {
-    await context.unrouteAll({ behavior: 'wait' });
-    await context.close();
+    await other.close();
   }
+});
+
+test('a failed refresh preserves cached data and a storage failure never acknowledges a local operation', async ({
+  page,
+  backend,
+}) => {
+  await seed(page, backend);
+  backend.failReads = true;
+  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'André', exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    Object.defineProperty(window, 'restorePut', {
+      value: () => {
+        IDBObjectStore.prototype.put = original;
+      },
+    });
+    IDBObjectStore.prototype.put = function () {
+      throw new DOMException('test-only quota injection', 'QuotaExceededError');
+    };
+  });
+  await page.getByLabel('Nome do jogador').fill('Quota test');
+  await page.getByRole('button', { name: 'Adicionar', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Não foi possível guardar');
+  await expect(page.getByLabel('Nome do jogador')).toHaveValue('Quota test');
+  expect((await outbox(page)).queue).toEqual([]);
+  await page.evaluate(() => {
+    (Reflect.get(window, 'restorePut') as () => void)();
+  });
+});
+
+test('lost deactivation acknowledgement persists no authorization word and replays its receipt after reload', async ({
+  page,
+  backend,
+}) => {
+  const players = await seed(page, backend);
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByRole('button', { name: 'Desativar André', exact: true }).click();
+  backend.dropNextWrite = true;
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Palavra-chave de autorização').fill(backend.testAuthorizationWord);
+  await dialog.getByRole('button', { name: 'Desativar jogador', exact: true }).click();
+  await expect(dialog.getByText(/Não foi possível confirmar/)).toBeVisible();
+  const pending = await outbox(page);
+  expect(JSON.stringify(pending)).not.toContain(backend.testAuthorizationWord);
+  expect(pending.deactivation).toMatchObject({
+    input: { id: players[0].id, version: 1 },
+    uncertain: true,
+  });
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
+    backend.testAuthorizationWord
+  );
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByLabel('Nome do jogador').fill('Must wait for deactivation');
+  await expect(page.getByRole('button', { name: 'Adicionar', exact: true })).toBeDisabled();
+  await home(page);
+  await page.getByRole('button', { name: 'Revisar desativação pendente' }).click();
+  await expect(page.getByLabel('Palavra-chave de autorização')).toHaveValue('');
+  await page.getByLabel('Palavra-chave de autorização').fill(backend.testAuthorizationWord);
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Desativar jogador', exact: true })
+    .click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect((await outbox(page)).deactivation).toBeNull();
+  expect((await backend.players()).find((p) => p.id === players[0].id)).toMatchObject({
+    version: 2,
+  });
+});
+
+test('shared tabs preserve unsaved score input and coordinate a single sync lease', async ({
+  page,
+  context,
+  backend,
+}) => {
+  await seed(page, backend);
+  await start(page);
+  await home(page);
+  await synchronized(page);
+  const second = await context.newPage();
+  let release = () => {};
+  try {
+    await second.goto('./');
+    await expect(second.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+    for (const p of [page, second]) {
+      await p
+        .getByRole('navigation')
+        .getByRole('button', { name: 'Partidas', exact: true })
+        .click();
+      await p.getByRole('button', { name: /Abrir Partida/ }).focus();
+      await p.keyboard.press('Enter');
+    }
+    await score(second, '25', '19');
+    await score(page, '21', '18');
+    await page.getByRole('button', { name: 'Salvar placar', exact: true }).click();
+    await expect(second.getByRole('alert')).toContainText('Seu texto foi mantido');
+    await expect(second.getByRole('textbox', { name: 'Placar Time A', exact: true })).toHaveValue(
+      '25'
+    );
+    await expect(second.getByRole('button', { name: 'Salvar placar', exact: true })).toBeDisabled();
+    await second.getByRole('button', { name: 'Carregar placar atualizado' }).click();
+    await expect(second.getByRole('textbox', { name: 'Placar Time A', exact: true })).toHaveValue(
+      '21'
+    );
+    await home(page);
+    await home(second);
+    backend.writeGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
+    await expect(second.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
+    release();
+    backend.writeGate = null;
+    await expect(page.getByText('Tudo sincronizado', { exact: true })).toBeVisible();
+    await expect(second.getByRole('button', { name: 'Sincronizar', exact: true })).toBeEnabled();
+    expect((await outbox(second)).queue).toEqual([]);
+    expect((await backend.matches())[0]).toMatchObject({ version: 2, score_a: 21, score_b: 18 });
+  } finally {
+    release();
+    backend.writeGate = null;
+    await second.close();
+  }
+});
+
+test('corrupt local journal is preserved and exportable, never replaced by an empty state', async ({
+  page,
+  backend,
+}) => {
+  await seed(page, backend);
+  const corrupt = { schema: 2, base: 'damaged', queue: [{ request_id: 'preserve-this-record' }] };
+  await page.evaluate(
+    async ({ scope, value }) =>
+      new Promise<void>((resolve, reject) => {
+        const r = indexedDB.open('volley-lifecycle-v2', 1);
+        r.onsuccess = () => {
+          const db = r.result;
+          const tx = db.transaction('states', 'readwrite');
+          tx.objectStore('states').put(value, scope);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    { scope: apiUrl, value: corrupt }
+  );
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('recuperação');
+  expect(await outbox(page)).toEqual(corrupt);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar backup local' }).click();
+  const file = await (await download).createReadStream();
+  let text = '';
+  for await (const chunk of file!) text += chunk;
+  expect(JSON.parse(text).state).toEqual(corrupt);
+  expect(text).not.toContain('access_token');
+  expect(text).not.toContain('refresh_token');
+});
+
+test('legacy import preserves the original and historical winner without inventing scores or duplicates', async ({
+  page,
+  backend,
+}) => {
+  const original = JSON.stringify({
+    players: [
+      { name: 'André', present: false },
+      { name: 'Lana', present: false },
+    ],
+    matches: [{ number: 7, date: '09/11/2026', teamA: ['André'], teamB: ['Lana'], winner: 'A' }],
+  });
+  await page.addInitScript((raw) => {
+    if (!localStorage.getItem('volley-v1')) localStorage.setItem('volley-v1', raw);
+  }, original);
+  await seed(page, backend);
+  await page.getByRole('navigation').getByRole('button', { name: 'Ajustes' }).click();
+  await page
+    .getByRole('button', { name: 'Importar histórico deste aparelho', exact: true })
+    .click();
+  await expect(page.getByRole('dialog')).toContainText('2 jogadores e 1 partidas válidas');
+  await page.getByTestId('import-confirm').click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await backend.matches()).toMatchObject([
+    { status: 'finished', winner: 'A', score_a: null, score_b: null },
+  ]);
+  expect(await page.evaluate(() => localStorage.getItem('volley-v1'))).toBe(original);
+  await page
+    .getByRole('button', { name: 'Importar histórico deste aparelho', exact: true })
+    .click();
+  await page.getByTestId('import-confirm').click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await backend.matches()).toHaveLength(1);
+});
+
+test('v1 uncertain intents recover only accepted receipts; unknown requests stay preserved', async ({
+  page,
+  backend,
+}) => {
+  const acceptedId = crypto.randomUUID();
+  const unknownId = crypto.randomUUID();
+  await backend.mutate('create_player', { name: 'Already accepted' }, acceptedId);
+  const pending = [
+    {
+      request_id: acceptedId,
+      action: 'mutate',
+      operation: 'create_player',
+      input: { name: 'Already accepted' },
+    },
+    {
+      request_id: unknownId,
+      action: 'mutate',
+      operation: 'archive_match',
+      input: { id: crypto.randomUUID(), version: 1 },
+    },
+  ];
+  await page.addInitScript(
+    ({ url, pending }) => {
+      const key = 'volley-cloud-pending-v1:' + encodeURIComponent(url);
+      if (!localStorage.getItem('seeded-v1')) {
+        localStorage.setItem(key, JSON.stringify(pending));
+        localStorage.setItem('seeded-v1', 'true');
+      }
+    },
+    { url: apiUrl, pending }
+  );
+  await seed(page, backend);
+  await page.getByRole('button', { name: 'Verificar envios antigos' }).click();
+  await expect(page.getByRole('alert')).toContainText('envio antigo');
+  expect((await outbox(page)).legacyPending).toEqual([pending[1]]);
+  expect(await backend.players()).toHaveLength(3);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Verificar envios antigos' })).toBeVisible();
+  expect((await outbox(page)).legacyPending).toEqual([pending[1]]);
+  expect(await backend.matches()).toEqual([]);
+});
+
+test('offline v1 cache preserves archived unfinished games as read-only, without inventing archive dates', async ({
+  page,
+  backend,
+}) => {
+  const [a, b] = await backend.seedPlayers(['André', 'Lana']);
+  const archived = {
+    id: crypto.randomUUID(),
+    number: 1,
+    version: 1,
+    played_on: '2026-11-09',
+    winner: null,
+    participants: [
+      { player_id: a.id, name: a.name, side: 'A', position: 0 },
+      { player_id: b.id, name: b.name, side: 'B', position: 1 },
+    ],
+  };
+  const cache = {
+    players: [a, b],
+    matches: [],
+    archived: [archived],
+    ranking: [],
+    syncedAt: '2026-11-09T12:00:00Z',
+  };
+  await page.addInitScript(
+    ({ url, cache }) =>
+      localStorage.setItem(
+        'volley-cloud-cache-v1:' + encodeURIComponent(url),
+        JSON.stringify(cache)
+      ),
+    { url: apiUrl, cache }
+  );
+  backend.failReads = true;
+  await page.goto('./');
+  await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+  await page.getByRole('navigation').getByRole('button', { name: 'Ajustes' }).click();
+  await page.getByRole('button', { name: /Histórico arquivado anterior/ }).click();
+  await page.getByRole('button', { name: 'Em andamento', exact: true }).click();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await page.getByRole('button', { name: /Abrir Partida/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Finalizar partida', exact: true })).toHaveCount(0);
+  // Reading the legacy seed need not create a new IDB record. The original is durable.
+  expect(await outbox(page)).toBeUndefined();
+  expect(
+    JSON.parse(
+      (await page.evaluate(
+        (url) => localStorage.getItem('volley-cloud-cache-v1:' + encodeURIComponent(url)),
+        apiUrl
+      ))!
+    )
+  ).toEqual(cache);
 });
