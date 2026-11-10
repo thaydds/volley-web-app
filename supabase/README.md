@@ -1,6 +1,6 @@
 # Volley — contrato de dados, API e operações offline
 
-O novo ciclo de partidas está implementado nesta branch, com a migration aditiva `20261110150000_match_lifecycle.sql`. **Não foi aplicada nem publicada em produção nesta entrega.** As seis migrations anteriores pertencem à integração v1. A evidência remota da v1 no fim deste arquivo não certifica a nova versão.
+O novo ciclo de partidas está implementado nesta branch, com a migration aditiva `20261110163836_match_lifecycle.sql`. **Aplicada em produção em10/11/2026, junto da Edge Function versão7, após autorização explícita da usuária.** As seis migrations anteriores pertencem à integração v1. A evidência remota da v1 no fim deste arquivo não certifica a nova versão.
 
 ## Arquitetura e credenciais
 
@@ -77,7 +77,7 @@ Envios v1 ainda incertos são conservados em `legacyPending`. Verificar envios a
 
 ## Ativação
 
-Esta PR não ativa o novo serviço. Antes de produção:
+Plano executado após autorização da usuária; evidências na seção seguinte:
 
 1. DS: concluído pela usuária. PR #24 mergeada e components0.7.0 confirmada no npm; o app já fixa essa versão no package.json/lockfile.
 2. Fazer backup do banco e ensaiar todas as migrations numa base de staging com cópia representativa do legado. Conferir contagens, permissões, históricos com/sem vencedor e arquivos anteriores. Não usar `remote-checks.sql` antigo como certificação deste ciclo.
@@ -85,13 +85,13 @@ Esta PR não ativa o novo serviço. Antes de produção:
 4. Definir a frase de autorização com o responsável. Usar valor aleatório de alta entropia, guardado em gerenciador seguro. Um administrador configura `private.configure_deactivation_secret(text)` por sessão TLS e parâmetro vinculado, sem literal em script versionado, URL, histórico de terminal, relatório ou chat. O visitante e a Edge não têm permissão para configurar. A configuração está ausente por padrão: desativação falha fechada; demais fluxos podem ser revisados/testados com fixtures locais.
 5. Obter autorização de publicação/migração/deploy, coordenar banco → Edge → app e verificar a versão publicada. Clientes v1 antigos não podem finalizar/excluir pelo contrato anterior; solicitar atualização. Preservar backups e recibos durante a transição. Não reverter a migration removendo colunas ou dados para recuperar a UI antiga.
 
-Preparar PR não concede autorização para esses passos em produção. A frase real ainda não foi definida nesta entrega.
+A autorização de produção foi dada em seguida pela usuária. A frase foi recebida por formulário seguro, validada localmente e gravada somente como salt/digestSHA256; não foi necessária senha adicional do banco. A frase bruta não foi enviada em SQL, registrada em código ou incluída nos backups.
 
 ## Validação e limites
 
 `npm run test:backend`: SQL de todas as migrations em PGlite, grants/RLS, legado, imutabilidade, autorização/rate limit, recibos e handler. `npm run test:coverage`: regras, projeção da fila, ranking por UUID e interações. `npm run test:e2e`: build real, handler e SQL locais, Auth externo simulado; Light/Dark, 393/320/1440px, teclado, offline/reload, resposta incerta, dispositivos independentes, abas, conflitos, armazenamento e recuperação.
 
-Esses testes não certificam GoTrue, políticas/quotas remotas, concorrência entre conexões PostgreSQL reais ou a implantação atual. Nenhum dado foi gravado em produção nesta entrega. O acesso segue compartilhado: visitantes podem cadastrar e registrar resultados; não há propriedade por usuário. Quotas e palavra-chave reduzem abuso, mas não garantem disponibilidade contra múltiplas sessões. A ausência de CAPTCHA foi uma decisão explícita da usuária.
+Esses testes não certificam GoTrue, políticas/quotas remotas, concorrência entre conexões PostgreSQL reais ou a implantação atual. A ativação foi validada no serviço real conforme registro abaixo. O acesso segue compartilhado: visitantes podem cadastrar e registrar resultados; não há propriedade por usuário. Quotas e palavra-chave reduzem abuso, mas não garantem disponibilidade contra múltiplas sessões. A ausência de CAPTCHA foi uma decisão explícita da usuária.
 
 A toolchain tinha alertas de auditoria anteriores à mudança; não atualizamos dependências de ferramentas como parte deste fluxo. O pacote de componentes0.7.0 publicado no npm substitui o artefato de revisão; o lockfile fixa sua versão e integridade.
 
@@ -126,3 +126,16 @@ O Advisor continua apontando as três RPCs autenticadas intencionalmente privile
 e informa proteção contra senhas vazadas desabilitada. O Volley usa sessões anônimas,
 sem senha; nenhuma política dos demais provedores foi modificada.
 [Proteção de senhas no Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+## Ativação do ciclo em produção ·10/11/2026
+
+- Backup privado dos7 conjuntos de dados e funções, com cópia da Edge anterior; rehearsal da migration usando a cópia real preservou os4 jogadores.
+- Migration remota `20261110163836_match_lifecycle` aplicada. O nome local foi alinhado ao histórico remoto para não repetir a migration em futuras execuções CLI.
+- `volley-api` versão7 publicada; Auth do visitante continua validado pelo handler e pelo PostgREST. Nenhuma chave de projeto no frontend.
+- Palavra de desativação recebida por formulário seguro. Validação de tamanho e cálculo do digest aconteceram localmente; somente salt/verificador foram gravados via conexão administrativa existente. Sem senha direta do banco ou palavra literal em SQL.
+- HTTP real: sessão obrigatória,2 sessões independentes, criação visível no outro cliente, reenvio idempotente entre sessões, palavra incorreta recusada, desativação/replay com autorização e reativação preservando UUID passaram.
+- SQL real dentro de transação com rollback: iniciar, salvar0×0, conflito de versão, empate recusado, finalizar21×18 com vencedorA, edição final recusada e trigger de imutabilidade passaram. Não foram persistidas partidas de teste; sequências podem ter intervalos após rollback.
+- Um jogador temporário, seus recibos/auditoria e2 contas anônimas de teste foram removidos por IDs registrados e guardas de nome/versão/ausência de participações. Contagens finais:4 jogadores,0 partidas e4 eventos de auditoria originais. Nenhum registro de terceiro foi excluído.
+- Conferido: visitante não tem acesso ao schema privado nem permissão para configurar a autorização. Os testes locais anteriores e CI continuam documentados na PR; não houve teste de carga.
+
+A publicação do frontend segue o merge da PR11 e o workflow de GitHub Pages, verificados separadamente. A frase é necessária apenas para desativação; demais operações seguem compartilhadas. Para trocar a frase futuramente, usar entrada segura e configuração administrativa; não colocá-la no repositório, no chat ou na URL.

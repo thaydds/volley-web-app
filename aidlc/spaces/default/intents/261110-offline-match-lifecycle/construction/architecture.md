@@ -46,3 +46,7 @@ Runtime JS scan found no embedded project key/JWT, server key variable or test a
 Review hardening: an uncertain online deactivation blocks incompatible new intents until its receipt is recovered; queue checks are repeated inside the same leased IDB transaction. Legacy archived unfinished matches remain read-only even when the old cache did not include an archive timestamp; no date is fabricated. Browser regression covers both cases.
 
 Malformed v1 pending journals are not silently filtered away by import/recovery: a strict check blocks replacement and preserves the original raw journal for backup.
+
+## Authorized production activation
+
+User explicitly authorized backup → migration → API → secret configuration → app publication. Original restrictions above describe the initial review-only handoff. Applied remote migration20261110163836 and Edgev7; local filename aligned. Four original players preserved. Secure input was validated and hashed locally; only salt/digest went through SQL, no additional database password needed. Real HTTP two-session/idempotency/deactivation/reactivation checks passed; actual SQL score/finalization/conflict checks rolled back. Test-only player, receipts, audit and anonymous actors cleaned by recorded IDs/guards; original4players/0matches/4audit rows remain. Frontend merge/deploy is the final activation step.

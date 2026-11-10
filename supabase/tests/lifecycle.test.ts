@@ -23,7 +23,7 @@ beforeAll(async () => {
   );
   for (const name of readdirSync(new URL('../migrations/', import.meta.url)).sort()) {
     if (!name.endsWith('.sql')) continue;
-    if (name.startsWith('20261110150000')) {
+    if (name.startsWith('20261110163836')) {
       await db.query("select set_config('request.jwt.claim.sub',$1,false)", [actor]);
       const create = async (name: string) =>
         (

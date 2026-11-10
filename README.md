@@ -4,7 +4,7 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 [Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) · [App publicado](https://thaydds.github.io/volley-web-app/)
 
-**Esta branch é uma proposta para revisão.** Inclui migração e API ainda não aplicadas ao Supabase remoto. Usa **@beachsports/components 0.7.0**, publicada no npm após o merge da PR #24, e tokens0.1.1. O pacote temporário de revisão foi removido. Para ativar o novo backend, seguir a [sequência de ativação](supabase/README.md#ativação).
+**Backend ativado em10/11/2026:** migration de ciclo de partidas aplicada, Edge Function `volley-api` versão7 publicada e autorização de desativação configurada. O banco preservou os4 jogadores existentes. O app usa components0.7.0 e tokens0.1.1; publicação do frontend depende do merge/deploy desta PR.
 
 ## Fluxo
 
