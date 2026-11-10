@@ -114,6 +114,7 @@ export class LifecycleEngine {
     if (!validCommand(command)) throw new ApiError(400, 'invalid_command');
     await this.store.edit((state) => {
       if (state.lease && state.lease.until > Date.now()) throw new ApiError(0, 'sync_running');
+      if (state.deactivation) throw new ApiError(0, 'pending_deactivation');
       if (state.queue.length >= 5000) throw new ApiError(0, 'queue_full');
       const data = project(state);
       if (!data) throw new ApiError(0, 'not_loaded');
@@ -237,13 +238,12 @@ export class LifecycleEngine {
   }
   async deactivate(id: string, word: string) {
     if (!navigator.onLine) throw new ApiError(0, 'offline');
-    const current = await this.store.read();
-    if (current.queue.length || current.legacyPending.length)
-      throw new ApiError(0, 'pending_request');
     await this.lease();
     try {
       let request: Deactivation | null = null;
       await this.store.edit((state) => {
+        if (state.queue.length || state.legacyPending.length)
+          throw new ApiError(0, 'pending_request');
         const player = state.base?.players.find((p) => p.id === id);
         if (!player) throw new ApiError(404, 'not_found');
         if (state.deactivation && state.deactivation.input.id !== id)

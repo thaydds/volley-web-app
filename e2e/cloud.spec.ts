@@ -186,6 +186,11 @@ test('lost deactivation acknowledgement persists no authorization word and repla
     backend.testAuthorizationWord
   );
   await page.reload();
+  await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Quem veio hoje?', exact: true }).click();
+  await page.getByLabel('Nome do jogador').fill('Must wait for deactivation');
+  await expect(page.getByRole('button', { name: 'Adicionar', exact: true })).toBeDisabled();
+  await home(page);
   await page.getByRole('button', { name: 'Revisar desativação pendente' }).click();
   await expect(page.getByLabel('Palavra-chave de autorização')).toHaveValue('');
   await page.getByLabel('Palavra-chave de autorização').fill(backend.testAuthorizationWord);
@@ -364,4 +369,58 @@ test('v1 uncertain intents recover only accepted receipts; unknown requests stay
   await expect(page.getByRole('button', { name: 'Verificar envios antigos' })).toBeVisible();
   expect((await outbox(page)).legacyPending).toEqual([pending[1]]);
   expect(await backend.matches()).toEqual([]);
+});
+
+test('offline v1 cache preserves archived unfinished games as read-only, without inventing archive dates', async ({
+  page,
+  backend,
+}) => {
+  const [a, b] = await backend.seedPlayers(['André', 'Lana']);
+  const archived = {
+    id: crypto.randomUUID(),
+    number: 1,
+    version: 1,
+    played_on: '2026-11-09',
+    winner: null,
+    participants: [
+      { player_id: a.id, name: a.name, side: 'A', position: 0 },
+      { player_id: b.id, name: b.name, side: 'B', position: 1 },
+    ],
+  };
+  const cache = {
+    players: [a, b],
+    matches: [],
+    archived: [archived],
+    ranking: [],
+    syncedAt: '2026-11-09T12:00:00Z',
+  };
+  await page.addInitScript(
+    ({ url, cache }) =>
+      localStorage.setItem(
+        'volley-cloud-cache-v1:' + encodeURIComponent(url),
+        JSON.stringify(cache)
+      ),
+    { url: apiUrl, cache }
+  );
+  backend.failReads = true;
+  await page.goto('./');
+  await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
+  await page.getByRole('navigation').getByRole('button', { name: 'Ajustes' }).click();
+  await page.getByRole('button', { name: /Histórico arquivado anterior/ }).click();
+  await page.getByRole('button', { name: 'Em andamento', exact: true }).click();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await page.getByRole('button', { name: /Abrir Partida/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Finalizar partida', exact: true })).toHaveCount(0);
+  // Reading the legacy seed need not create a new IDB record. The original is durable.
+  expect(await outbox(page)).toBeUndefined();
+  expect(
+    JSON.parse(
+      (await page.evaluate(
+        (url) => localStorage.getItem('volley-cloud-cache-v1:' + encodeURIComponent(url)),
+        apiUrl
+      ))!
+    )
+  ).toEqual(cache);
 });

@@ -269,6 +269,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
         state.legacyPending.length
       )
         throw new Error('pending_request');
+      engine.transport.assertLegacyJournalReadable();
       try {
         for (const batch of importBatches(
           legacy,
@@ -489,6 +490,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
                 <li key={m.id}>
                   <MatchPanel
                     game={m}
+                    readOnly={archived}
                     pending={pendingFor(m.id)}
                     disabled={sync.locked || !!m.deleted_at}
                     onOpen={() => openGame(m)}
@@ -510,7 +512,9 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           description={
             game.status === 'finished'
               ? 'Resultado confirmado · não é possível editar.'
-              : 'Em andamento · participantes definidos no pré-jogo.'
+              : data.archived.some((m) => m.id === game.id)
+                ? 'Histórico arquivado anterior · somente consulta.'
+                : 'Em andamento · participantes definidos no pré-jogo.'
           }
           badge={gameTitle(game)}
           onBack={() => go('matches')}
@@ -527,7 +531,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
                   Quem veio hoje?
                 </Button>
               </>
-            ) : (
+            ) : data.archived.some((m) => m.id === game.id) ? null : (
               <div ref={setGameFooter} className={styles.stack} />
             )
           }
@@ -539,6 +543,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           <MatchPanel
             key={game.id}
             game={game}
+            readOnly={data.archived.some((m) => m.id === game.id)}
             pending={pendingFor(game.id)}
             detail
             footer={gameFooter}

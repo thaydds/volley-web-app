@@ -1,6 +1,18 @@
 import { VolleyClient, ApiError, isObject, type Pending } from '../shared/client';
 import { validPlayer, validGame, type Snapshot, type Command, type Deactivation } from './domain';
 export class LifecycleTransport extends VolleyClient {
+  assertLegacyJournalReadable() {
+    // A filtered v1 journal must never be overwritten by a new import.
+    try {
+      const raw = this.storage.getItem(this.pendingKey);
+      if (raw === null) return;
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length !== this.pending().length)
+        throw new Error('corrupt');
+    } catch {
+      throw new ApiError(0, 'storage_corrupt');
+    }
+  }
   async readState(): Promise<Snapshot> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const revisions = new Set<string>();
@@ -87,6 +99,7 @@ export class LifecycleTransport extends VolleyClient {
     return result;
   }
   async recoverLegacy(request: Pending): Promise<boolean> {
+    this.assertLegacyJournalReadable();
     const result = await this.authenticated('recover', {
       request_id: request.request_id,
       operation: request.action === 'import' ? 'import_history' : request.operation,

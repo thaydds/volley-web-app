@@ -12,6 +12,7 @@ export function MatchPanel({
   onFinish,
   disabled = false,
   detail = false,
+  readOnly = false,
   footer,
 }: {
   game: Game;
@@ -21,6 +22,7 @@ export function MatchPanel({
   onFinish?: (a: number, b: number) => void;
   disabled?: boolean;
   detail?: boolean;
+  readOnly?: boolean;
   footer?: HTMLElement | null;
 }) {
   const [a, setA] = useState(game.score_a === null ? '' : String(game.score_a));
@@ -50,7 +52,9 @@ export function MatchPanel({
     metadata: game.played_on.split('-').reverse().join('/'),
     teamA: { name: 'Time A', score: game.score_a ?? '—', players: names(game, 'A') },
     teamB: { name: 'Time B', score: game.score_b ?? '—', players: names(game, 'B') },
-    description: 'Partida em andamento',
+    description: readOnly
+      ? 'Histórico arquivado anterior · somente consulta.'
+      : 'Partida em andamento',
   };
   const inputs = {
     A: (
@@ -145,7 +149,11 @@ export function MatchPanel({
             )}
           </ScoreMatch>
         ) : (
-          <ScoreMatch {...common} scoreContent={inputs} statusLabel="Em andamento" />
+          <ScoreMatch
+            {...common}
+            scoreContent={readOnly ? undefined : inputs}
+            statusLabel={readOnly ? 'Arquivada · registro anterior' : 'Em andamento'}
+          />
         )}
         {onOpen && (
           <Button variant="ghost" className={styles.cardOpen} onClick={onOpen}>
@@ -153,7 +161,7 @@ export function MatchPanel({
           </Button>
         )}
       </div>
-      {!finished && (
+      {!finished && !readOnly && (
         <>
           {obsolete && (
             <div className={styles.stack}>

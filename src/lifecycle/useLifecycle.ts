@@ -139,7 +139,7 @@ export function useLifecycle(apiUrl: string) {
     synchronize,
     retryInitial,
     reload,
-    locked: busy || !!(state.lease && state.lease.until > Date.now()),
+    locked: busy || !!state.deactivation || !!(state.lease && state.lease.until > Date.now()),
     pending: state.queue.length + state.legacyPending.length + (state.deactivation ? 1 : 0),
   };
 }
