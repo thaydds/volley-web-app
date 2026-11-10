@@ -73,7 +73,15 @@ export class Backend {
         return json(result);
       } catch (error) {
         const e = error as { code?: string; message?: string };
-        return json({ code: e.code, message: e.message }, 400);
+        const status =
+          e.code && /^PT[0-9]{3}$/.test(e.code)
+            ? Number(e.code.slice(2))
+            : e.code?.startsWith('40')
+              ? 500
+              : e.code === '23505'
+                ? 409
+                : 400;
+        return json({ code: e.code, message: e.message }, status);
       }
     }
   );

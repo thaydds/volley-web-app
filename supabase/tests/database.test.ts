@@ -140,7 +140,7 @@ describe('private storage and fixed RPC contract', () => {
     expect(updated.version).toBe(2);
     await expect(
       mutation('set_match_winner', { id: match, version: 1, winner: 'B' })
-    ).rejects.toThrow(/version_conflict/);
+    ).rejects.toMatchObject({ code: 'PT409', message: 'version_conflict' });
     expect((await read('ranking')).find((p) => p.id === a)?.points).toBe(1);
   });
   it('preserves snapshots and player identity through rename and archival', async () => {

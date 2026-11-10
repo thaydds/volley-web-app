@@ -250,7 +250,8 @@ export function createHandler(config: ApiConfig, http: typeof fetch = fetch) {
       if (result.ok) return reply(200, data);
       if (result.status === 401) return reply(401, { error: 'invalid_session' });
       const code = object(data) ? data.code : undefined;
-      if (code === '40001' || code === '23505') return reply(409, { error: 'conflict' });
+      if (code === 'PT409' || code === '40001' || code === '23505')
+        return reply(409, { error: 'conflict' });
       if (code === 'P0002') return reply(404, { error: 'not_found' });
       if (object(data) && code === 'P0001' && data.message === 'rate_limit')
         return reply(429, { error: 'rate_limit' });

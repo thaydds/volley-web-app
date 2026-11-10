@@ -168,6 +168,7 @@ describe('keyless browser API', () => {
   it('sanitizes upstream failures and maps conflicts and rate limits', async () => {
     for (const [error, status] of [
       [{ code: '40001' }, 409],
+      [{ code: 'PT409' }, 409],
       [{ code: 'P0001', message: 'rate_limit' }, 429],
       [{ code: '23514' }, 400],
       [{ code: 'XX000', message: config.supabaseKey, details: 'SQL hidden' }, 502],

@@ -45,7 +45,7 @@ begin
   begin
     perform public.volley_mutate('create_player',request_id,jsonb_build_object('name','different'));
     raise exception 'request_reuse_was_allowed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   b := (public.volley_mutate('create_player',gen_random_uuid(),jsonb_build_object('name', chr(39) || '; DROP TABLE players; --'))->>'id')::uuid;
   result := public.volley_mutate('create_match',gen_random_uuid(),jsonb_build_object(
     'played_on','2026-11-09','participants',jsonb_build_array(
@@ -56,7 +56,7 @@ begin
   begin
     perform public.volley_mutate('set_match_winner',gen_random_uuid(),jsonb_build_object('id',m,'version',1,'winner','B'));
     raise exception 'stale_write_was_allowed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   select value into result from jsonb_array_elements(public.volley_read('ranking')->'items') where value->>'id'=a::text;
   if result is null or (result->>'points')::integer <> 1 then raise exception 'ranking_invalid'; end if;
   perform public.volley_mutate('archive_match',gen_random_uuid(),jsonb_build_object('id',m,'version',2));
@@ -74,7 +74,7 @@ begin
   begin
     perform public.volley_import(gen_random_uuid(),jsonb_build_object('source_id',gen_random_uuid(),'players','[]'::jsonb,'matches',jsonb_build_array(jsonb_build_object('key','other-device','played_on','2026-11-01','winner','A','team_a',jsonb_build_array('__import_A__'),'team_b',jsonb_build_array('__import_B__')))));
     raise exception 'cross_device_duplicate_allowed';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   if public.volley_read('players')->>'revision' is null then raise exception 'missing_snapshot_revision'; end if;
 end $$;
 reset role;

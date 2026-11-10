@@ -46,9 +46,9 @@ sem CAPTCHA, com tokens de sessão e permissões no banco. Presença e preferên
 continuam no aparelho. Há prévia para importar o `volley-v1` antigo, preservando
 a cópia original, e cache offline somente para consulta.
 
-**Ativação pendente:** habilitar Anonymous Sign-Ins no projeto Supabase antes do
-merge/deploy. O endpoint real confirma que esse acesso ainda está desabilitado.
-Contrato, configuração, evidências e limites estão em [supabase/README.md](supabase/README.md).
+**Acesso anônimo habilitado e API validada com clientes reais.** O merge publica
+a integração no GitHub Pages. Contrato, configuração, evidências e limites estão
+em [supabase/README.md](supabase/README.md).
 
 `npm run dev` sem VITE_VOLLEY_API_URL mantém a prévia local legada. O build de
 produção é configurado para a API. Os testes de navegador interceptam esse endpoint

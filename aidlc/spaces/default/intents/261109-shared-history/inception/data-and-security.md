@@ -168,3 +168,13 @@ painel foi cancelado; não foi tentado contornar essa autenticação. É necess�
 habilitar Anonymous Sign-Ins e validar duas sessões e quotas reais antes de ativar.
 Os testes de navegador usam o handler e migrations reais, com Auth externo simulado.
 Supabase/README.md registra o contrato final; o desenho anterior acima é histórico.
+
+## Validação real após habilitação de Auth
+
+O usuário ativou Anonymous Sign-Ins e confirmou a conclusão. Sessões, renovação,
+compartilhamento entre clientes, resposta perdida seguida de nova sessão, ranking,
+remoção/restauração e importação foram testados na API real. Um conflito de edição
+revelou espera indevida no caminho HTTP; a sexta migration usa PT409 para conflitos
+de negócio. A repetição do teste obteve uma gravação aceita e outra recusada com
+409 em 666 ms. Todos os registros e perfis de teste foram removidos por IDs próprios.
+A autenticação não está mais bloqueada. Não houve merge nem deploy do frontend.

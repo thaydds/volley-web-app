@@ -1,17 +1,15 @@
 # Volley — banco, API e integração
 
 A PR #10 contém a integração completa das telas, migração com prévia e consulta
-offline. Cinco migrations foram aplicadas ao projeto `xejuimptprhvrjohhqyn` e a
+offline. Seis migrations foram aplicadas ao projeto `xejuimptprhvrjohhqyn` e a
 Edge Function `volley-api` foi publicada. O app publicado ainda depende do merge.
 
-**Bloqueio de ativação confirmado em 2026-11-09:** o endpoint real de criação de
-sessão retorna `anonymous_sign_in_disabled`. Habilitar Anonymous Sign-Ins no
-[Supabase Auth](https://supabase.com/dashboard/project/xejuimptprhvrjohhqyn/auth/providers)
-e revisar as [quotas de Auth](https://supabase.com/dashboard/project/xejuimptprhvrjohhqyn/auth/rate-limits)
-antes de ativar o app. A tentativa de acesso assistido ao painel foi cancelada.
-Não há outra conexão autorizada que permita alterar essa configuração. O
-`enable_anonymous_sign_ins` do config.toml configura o ambiente local, não muda
-automaticamente o projeto remoto.
+**Acesso habilitado e validação real concluída:** o usuário ativou Anonymous
+Sign-Ins. Dois clientes independentes acessaram a API publicada, compartilharam
+jogadores, partidas e ranking, renovaram sessão e verificaram conflitos,
+restauração, importação e deduplicação. O app publicado será atualizado pelo merge.
+Os limites reais foram exercitados apenas em uso normal, sem teste de carga ou
+esgotamento de quotas. A configuração local em config.toml não altera o remoto.
 
 ## Arquitetura e chaves
 
@@ -140,8 +138,7 @@ Não encaminhamos IP fornecido pelo navegador nem adicionamos chaves administrat
 para mudar esse comportamento. Validar criação, renovação, quotas e acesso por
 dois clientes no Supabase real depois de habilitar Anonymous Sign-Ins.
 
-A função já responde corretamente sem expor internals quando esse acesso está
-desabilitado. Os testes de banco com contexto JWT simulado passaram no projeto
+A função responde sem expor internals se esse acesso for desabilitado. Os testes de banco com contexto JWT simulado passaram no projeto
 real, incluindo importação, rejeição de duplicatas, revisão e permissões. Todos
 os registros de teste foram desfeitos; contagens finais de jogadores, partidas,
 participantes, recibos, importações e auditoria foram zero. Sequências podem ter
@@ -172,3 +169,33 @@ Referências: [chaves](https://supabase.com/docs/guides/getting-started/api-keys
 [acesso anônimo](https://supabase.com/docs/guides/auth/auth-anonymous),
 [quotas](https://supabase.com/docs/guides/auth/rate-limits),
 [erros de Auth](https://supabase.com/docs/guides/auth/debugging/error-codes).
+
+## Verificação HTTP no Supabase real
+
+Em 2026-11-10 UTC, após a habilitação pelo usuário, o cliente real em src/shared/client.ts
+foi executado contra a Edge Function publicada, sem chaves de projeto no cliente.
+
+- Requisição sem sessão recusada com 401; sessões anônimas independentes confirmadas.
+- Jogadores criados por um cliente apareceram no outro; nome com apóstrofo permaneceu dado.
+- Resposta de criação perdida de propósito, seguida de nova sessão e repetição do
+  mesmo UUID: somente uma partida foi criada.
+- Edições HTTP simultâneas com a mesma versão: uma aceita e outra com 409, em 666 ms
+  na rodada observada. O ranking refletiu o resultado confirmado.
+- Remoção e restauração apareceram no outro cliente; renovação preservou a identidade.
+- Importação real apareceu no outro cliente, reenvio da origem foi deduplicado e
+  possível duplicata de outro aparelho exigiu revisão.
+- Dois jogadores, duas partidas e sete contas anônimas temporárias, além dos seus
+  recibos, auditoria e vínculos, foram removidos por IDs registrados pelo teste,
+  com guardas de origem/nome/data. Contagens finais desses registros: zero.
+  Nenhum registro alheio ao teste foi removido. Tokens ficaram somente em memória.
+
+A validação encontrou que conflitos de negócio com SQLSTATE 40001 podiam resultar
+em espera/502 no caminho HTTP real. A sexta migration usa PT409 para devolver
+um conflito de aplicação diretamente, mantendo 40001 para falhas transacionais
+reais. Teste de regressão exige esse código; o handler aceita ambos por compatibilidade.
+[Erros HTTP definidos por função no PostgREST](https://docs.postgrest.org/en/stable/references/errors.html#raise-errors-with-http-status-codes).
+
+O Advisor continua apontando as três RPCs autenticadas intencionalmente privilegiadas
+e informa proteção contra senhas vazadas desabilitada. O Volley usa sessões anônimas,
+sem senha; nenhuma política dos demais provedores foi modificada.
+[Proteção de senhas no Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
