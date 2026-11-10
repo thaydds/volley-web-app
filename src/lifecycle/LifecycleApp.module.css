@@ -186,3 +186,8 @@
 .detail > [data-badge] {
   align-self: flex-start;
 }
+
+/* Presence is a tap control, not a drag handle. Preserve browser pan/zoom. */
+.presence button {
+  touch-action: manipulation;
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LifecycleEngine, lifecycleError } from './engine';
 import { LifecycleTransport } from './transport';
 import { emptyState, project, type LocalState } from './domain';
@@ -125,10 +125,14 @@ export function useLifecycle(apiUrl: string) {
     await run(() => engine.refresh());
     setReady(true);
   }
+  const data = useMemo(
+    () => project({ ...emptyState(), base: state.base, queue: state.queue }),
+    [state.base, state.queue]
+  );
   return {
     engine,
     state,
-    data: project(state),
+    data,
     ready,
     busy,
     syncing,
