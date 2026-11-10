@@ -15,7 +15,7 @@ Initial spinner only with accessible name, offline cached open or retry failure.
 
 ## DS
 
-ScoreMatch live scoreContent {A,B} slots replace only numeric cells, preserve team labels/players/metadata; finished ignores slots and remains numeric. Optional statusLabel preserves defaults. Chip showSelectionIndicator renders native selected check without default icon. Removable right inset0 follows explicit approved documentation2098:55311 despite master right16. Tests/Storybook Light/Dark/320. App review can consume a reproducible prerelease tarball built from DS PR commit; no npm release fabricated. Replace review dependency with approved published DS version before app production adoption.
+ScoreMatch live scoreContent {A,B} slots replace only numeric cells, preserve team labels/players/metadata; finished ignores slots and remains numeric. Optional statusLabel preserves defaults. Chip showSelectionIndicator renders native selected check without default icon. Removable right inset0 follows explicit approved documentation2098:55311 despite master right16. Tests/Storybook Light/Dark/320. The user merged DS PR24 and published components0.7.0; npm availability was verified, app/lockfile now pin that release. Temporary review artifacts/scripts were removed.
 
 ## Storage/synchronization
 
@@ -37,7 +37,7 @@ Actual SQL migrations in PGlite + real API handler, mocked Auth only. Test direc
 
 ## Review implementation and local evidence
 
-DS PR24, exact source commit5df85620b0e082de81700b2755ba5ec7d86a5f91; CI Quality/Storybook/browser tests passed. App vendor digest is checked by verify:ds-review and npm lock integrity; this is a review dependency, not a published release. UI is separated into HomeScreen, PresenceScreen, PrepTeams, MatchPanel, DialogViews and ConflictDialog; LifecycleApp coordinates navigation/actions, engine owns journal/transport.
+DS PR24, exact source commit5df85620b0e082de81700b2755ba5ec7d86a5f91; CI Quality/Storybook/browser tests passed. After user publication, the app consumes npm components0.7.0 with lock integrity, replacing the original review tarball. UI is separated into HomeScreen, PresenceScreen, PrepTeams, MatchPanel, DialogViews and ConflictDialog; LifecycleApp coordinates navigation/actions, engine owns journal/transport.
 
 Local validation: lint, formatting, TypeScript frontend/backend and production PWA build passed;112 unit tests (89.55% lines,90.07% branches, no threshold reduction),50 SQL/API/client tests,49 browser cases passed across393/320/1440 with2 intentional skips (native pointer test desktop-only; keyboard move covered everywhere). Browser fixture uses the actual handler and complete migration chain in PGlite; only external Auth is simulated. Captures compare live, home, presence, pregame and confirmation in Light/Dark; axe and layout assertions passed. Initial spinner is checked while reads are paused; IDB quota/corruption, lost acknowledgements, manual reconnect behavior, cross-device conflict, cross-tab lease/dirty input and legacy import/recovery are covered. No production fixtures, migrations or deployment.
 

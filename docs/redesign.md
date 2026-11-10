@@ -14,7 +14,7 @@ Fonte: [frames atuais](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei
 | Desativar / erro / reativar | 2184:19935 / 2184:19992 / 2184:20135 | Modais DS; palavra em memória, erro no campo, autorização DB, reativação explícita do UUID.                     |
 | Finalizadas / carregamento  | 2124:10622 / 2184:17061              | Somente números e leitura; spinner sem texto visual, com nome acessível.                                        |
 
-O slot nativo Score content do Live permite inputs no lugar dos números; Finished permanece numérico. A [PR #24 do DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) acrescenta composição tipada sem duplicar/desanexar ScoreMatch ou mudar labels existentes. O artefato de revisão do app registra exatamente commit/SHA256; substituir pela release aprovada antes da adoção normal em produção.
+O slot nativo Score content do Live permite inputs no lugar dos números; Finished permanece numérico. A [PR #24 do DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) acrescenta composição tipada sem duplicar/desanexar ScoreMatch ou mudar labels existentes. A PR foi mergeada e o app agora usa a release npm0.7.0, fixada no lockfile; o artefato de revisão foi removido.
 
 A correção aprovada do Chip segue documentação2098:55311: padding esquerdo16, gap8, direito0 depois do × com área44. O master tinha direito16; esta divergência foi documentada na PR DS, sem alterar tokens canônicos. O scrim do Modal continua a exceção documentada da versão0.6.0 do DS; não inventamos token de overlay.
 

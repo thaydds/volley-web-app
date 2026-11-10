@@ -1,9 +1,0 @@
-{
-  "source": "https://github.com/thaydds/Beach-Sports-DS",
-  "commit": "5df85620b0e082de81700b2755ba5ec7d86a5f91",
-  "version": "0.6.0-review.score-content.5df85620",
-  "file": "beachsports-components-0.6.0-review.score-content.5df85620.tgz",
-  "sha256": "852a691ed8d5e78c0004f79df59ed966efd9d08d72b8fc4b5fc313d85bf0f1b0",
-  "purpose": "Review-only artifact. Replace with an approved npm release before production adoption.",
-  "build": "node tools/pack-ds-review.mjs <clean-DS-checkout>"
-}

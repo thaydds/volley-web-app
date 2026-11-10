@@ -4,7 +4,7 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 [Design no Figma](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496) · [DS](https://github.com/thaydds/Beach-Sports-DS/pull/24) · [App publicado](https://thaydds.github.io/volley-web-app/)
 
-**Esta branch é uma proposta para revisão.** Inclui migração e API ainda não aplicadas ao Supabase remoto. O componente usa um artefato de revisão da PR #24 do DS, com commit e SHA256 em `vendor/components-review.json`; nenhuma versão foi publicada no npm. Antes da adoção em produção, substituir esse arquivo pela versão publicada e aprovada do DS e seguir a [sequência de ativação](supabase/README.md#ativação).
+**Esta branch é uma proposta para revisão.** Inclui migração e API ainda não aplicadas ao Supabase remoto. Usa **@beachsports/components 0.7.0**, publicada no npm após o merge da PR #24, e tokens0.1.1. O pacote temporário de revisão foi removido. Para ativar o novo backend, seguir a [sequência de ativação](supabase/README.md#ativação).
 
 ## Fluxo
 
@@ -20,7 +20,6 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 ```bash
 npm ci
-npm run verify:ds-review
 npm run dev
 ```
 
@@ -38,14 +37,6 @@ npm run test:e2e
 ```
 
 Os testes de navegador usam build de produção, handler real e migrations reais em PGlite, com Auth externo simulado; não acessam o projeto remoto. Cobrem 393px, 320px e desktop, Light/Dark, acessibilidade, offline/reload, dispositivos independentes, abas, idempotência, conflitos e falhas de armazenamento. Evidências: `test-results/` e `playwright-report/`.
-
-Para reconstruir o pacote de revisão a partir de um checkout limpo do DS:
-
-```bash
-node tools/pack-ds-review.mjs /caminho/para/beach-sports-ds
-```
-
-Depois instalar o `.tgz` indicado no manifesto e atualizar o lockfile. O verificador do CI confere o arquivo, a origem e sua integridade. Após aprovação e publicação do DS, trocar a dependência `file:` por versão npm exata, remover somente os artefatos de revisão e adaptar a verificação do CI.
 
 Tokens 0.1.1, CSS Modules e fonte Inter local continuam compartilhados; a fonte entra no cache offline. Preferências, presença e pré-jogo são locais. Backups anteriores `volley-v1` são preservados. [Contrato, segurança e recuperação](supabase/README.md) · [decisões de arquitetura](aidlc/spaces/default/intents/261110-offline-match-lifecycle/construction/architecture.md).
 

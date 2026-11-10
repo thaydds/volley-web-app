@@ -79,7 +79,7 @@ Envios v1 ainda incertos são conservados em `legacyPending`. Verificar envios a
 
 Esta PR não ativa o novo serviço. Antes de produção:
 
-1. Revisar e aprovar a PR #24 do DS; publicar a versão por autorização separada e substituir o artefato `file:vendor/...` por dependência npm exata no app.
+1. DS: concluído pela usuária. PR #24 mergeada e components0.7.0 confirmada no npm; o app já fixa essa versão no package.json/lockfile.
 2. Fazer backup do banco e ensaiar todas as migrations numa base de staging com cópia representativa do legado. Conferir contagens, permissões, históricos com/sem vencedor e arquivos anteriores. Não usar `remote-checks.sql` antigo como certificação deste ciclo.
 3. Aplicar a migration aditiva e publicar o novo handler em staging. Validar Auth/renovação, dois dispositivos reais, quotas, conflitos e resposta perdida, com a mesma origem/configuração prevista para produção.
 4. Definir a frase de autorização com o responsável. Usar valor aleatório de alta entropia, guardado em gerenciador seguro. Um administrador configura `private.configure_deactivation_secret(text)` por sessão TLS e parâmetro vinculado, sem literal em script versionado, URL, histórico de terminal, relatório ou chat. O visitante e a Edge não têm permissão para configurar. A configuração está ausente por padrão: desativação falha fechada; demais fluxos podem ser revisados/testados com fixtures locais.
@@ -93,7 +93,7 @@ Preparar PR não concede autorização para esses passos em produção. A frase 
 
 Esses testes não certificam GoTrue, políticas/quotas remotas, concorrência entre conexões PostgreSQL reais ou a implantação atual. Nenhum dado foi gravado em produção nesta entrega. O acesso segue compartilhado: visitantes podem cadastrar e registrar resultados; não há propriedade por usuário. Quotas e palavra-chave reduzem abuso, mas não garantem disponibilidade contra múltiplas sessões. A ausência de CAPTCHA foi uma decisão explícita da usuária.
 
-A toolchain tinha alertas de auditoria anteriores à mudança; não atualizamos dependências de ferramentas como parte deste fluxo. Os scripts de revisão não publicam no npm. O pacote de componentes é identificado por commit/SHA256 e deve ser substituído antes da adoção normal em produção.
+A toolchain tinha alertas de auditoria anteriores à mudança; não atualizamos dependências de ferramentas como parte deste fluxo. O pacote de componentes0.7.0 publicado no npm substitui o artefato de revisão; o lockfile fixa sua versão e integridade.
 
 Referências: [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [sessões anônimas](https://supabase.com/docs/guides/auth/auth-anonymous), [chaves](https://supabase.com/docs/guides/getting-started/api-keys), [limites Auth](https://supabase.com/docs/guides/auth/rate-limits).
 
