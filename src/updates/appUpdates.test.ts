@@ -89,3 +89,46 @@ it('network failures retry later without affecting the running app', async () =>
   expect(h.updates.snapshot().error).toBe('');
   h.updates.stop();
 });
+
+it('the first install does not announce an update or reload the page', async () => {
+  const h = setup();
+  h.workers.controller = null as unknown as ServiceWorker;
+  h.updates.start();
+  await vi.advanceTimersByTimeAsync(0);
+  h.workers.dispatchEvent(new Event('controllerchange'));
+  expect(h.updates.snapshot().available).toBe(false);
+  expect(h.reload).not.toHaveBeenCalled();
+  h.updates.stop();
+});
+it('an ignored activation request times out safely and can be retried', async () => {
+  const h = setup();
+  const worker = { postMessage: vi.fn() };
+  h.registration.waiting = worker as unknown as ServiceWorker;
+  h.updates.start();
+  await vi.advanceTimersByTimeAsync(0);
+  h.updates.apply();
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(h.updates.snapshot()).toMatchObject({ available: true, applying: false });
+  expect(h.updates.snapshot().error).toContain('Não foi possível atualizar');
+  expect(h.reload).not.toHaveBeenCalled();
+  h.updates.apply();
+  expect(worker.postMessage).toHaveBeenCalledTimes(2);
+  h.updates.stop();
+});
+it('unsupported browsers keep the app usable without trying to register a worker', async () => {
+  const h = setup();
+  const updates = new AppUpdates({
+    workers: undefined,
+    events: h.events,
+    visibility: document,
+    online: h.online,
+    reload: h.reload,
+  });
+  updates.start();
+  await updates.check(true);
+  updates.apply();
+  expect(updates.snapshot().supported).toBe(false);
+  expect(h.workers.register).not.toHaveBeenCalled();
+  expect(h.reload).not.toHaveBeenCalled();
+  updates.stop();
+});
