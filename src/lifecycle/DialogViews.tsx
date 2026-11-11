@@ -82,7 +82,7 @@ export function DialogViews({
           )}
           {!!pendingQueue && (
             <Typography variant="text-s">
-              Sincronize as alterações pendentes na Home antes de desativar.
+              Aguarde a sincronização automática das alterações pendentes antes de desativar.
             </Typography>
           )}
         </Modal>

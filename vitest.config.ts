@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    exclude: ['e2e/**', 'supabase/**', 'node_modules/**', 'dist/**'],
+    exclude: ['e2e/**', 'pwa-e2e/**', 'tools/**', 'supabase/**', 'node_modules/**', 'dist/**'],
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     coverage: {

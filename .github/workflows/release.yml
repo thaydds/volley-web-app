@@ -1,0 +1,68 @@
+name: Release app
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-app
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Require successful CI for current main
+        id: guard
+        run: node tools/release/check-ci.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Prepare release PR or tag approved release
+        id: release
+        if: steps.guard.outputs.approved == 'true'
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
+      - name: Run CI for bot-authored release PR
+        if: steps.guard.outputs.approved == 'true'
+        run: node tools/release/dispatch-ci.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  deploy:
+    needs: prepare
+    if: needs.prepare.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.tag }}

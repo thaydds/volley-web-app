@@ -21,12 +21,16 @@ function buildRevision() {
   }
 }
 export default defineConfig({
-  define: { __APP_BUILD_VERSION__: JSON.stringify(`${packageVersion}+${buildRevision()}`) },
+  define: {
+    __APP_VERSION__: JSON.stringify(packageVersion),
+    __APP_BUILD_ID__: JSON.stringify(buildRevision()),
+  },
   base,
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['robots.txt', 'apple-touch-icon.png'],
       manifest: {
         name: 'Beach Sports — Vôlei',
@@ -56,8 +60,9 @@ export default defineConfig({
         categories: ['sports', 'utilities'],
       },
       workbox: {
+        skipWaiting: false,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        globDirectory: 'dist',
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

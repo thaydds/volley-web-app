@@ -1,7 +1,7 @@
 {
   "name": "volley-web-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "homepage": "https://thaydds.github.io/volley-web-app",
   "scripts": {
@@ -17,7 +17,9 @@
     "test:backend": "vitest run --config vitest.backend.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:release": "node --test tools/release/*.test.mjs",
+    "test:pwa": "playwright test --config playwright.pwa.config.ts"
   },
   "dependencies": {
     "@beachsports/components": "0.8.0",

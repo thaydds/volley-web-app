@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -23,6 +24,8 @@ jobs:
         run: npm run format:check
       - name: Typecheck
         run: npm run typecheck
+      - name: Release contracts
+        run: npm run test:release
       - name: Test with coverage
         run: npm run test:coverage
       - name: Database permissions and API security contracts
@@ -33,6 +36,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser flows and accessibility
         run: npm run test:e2e
+      - name: Real PWA update across two builds
+        run: npm run test:pwa
       - name: Save browser report
         if: failure()
         uses: actions/upload-artifact@v4

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Badge, Button, Card, Loading, Typography } from '@beachsports/components';
 import { Page } from './Page';
+import { AppUpdateNotice } from '../updates/AppUpdateNotice';
 import { DialogViews, type Dialog } from './DialogViews';
 import { HomeScreen } from './HomeScreen';
 import { ConflictDialog } from './ConflictDialog';
@@ -359,6 +360,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           onSettings={() => go('settings')}
           onRoster={() => go('roster')}
         >
+          <AppUpdateNotice disabled={sync.cloudLocked || dialogBusy || selection.pending} />
           {queueProblem && (
             <Button
               variant="secondary"
@@ -592,6 +594,10 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
         >
           <div className={styles.stack}>
             {alert}
+            <AppUpdateNotice
+              settings
+              disabled={sync.cloudLocked || dialogBusy || selection.pending}
+            />
             <Button variant="secondary" onClick={() => void backup()}>
               Exportar backup local
             </Button>

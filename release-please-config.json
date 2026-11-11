@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "faa76bd9b68b02b444e34ec3c2a4f87ca93d7576",
+  "release-type": "node",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "initial-version": "0.1.0",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "pull-request-header": "# Release do Volley App",
+  "pull-request-footer": "O merge desta PR, após CI aprovado, cria a tag e a GitHub Release e publica o app no GitHub Pages. A versão do app é independente do DS.",
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Novidades"
+    },
+    {
+      "type": "fix",
+      "section": "Correções"
+    },
+    {
+      "type": "perf",
+      "section": "Desempenho"
+    },
+    {
+      "type": "revert",
+      "section": "Reversões"
+    },
+    {
+      "type": "docs",
+      "section": "Documentação",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Manutenção",
+      "hidden": true
+    },
+    {
+      "type": "refactor",
+      "section": "Refatoração",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Testes",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "section": "Build",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "CI",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "Formatação",
+      "hidden": true
+    }
+  ],
+  "packages": {
+    ".": {}
+  }
+}

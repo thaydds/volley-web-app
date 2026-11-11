@@ -8,7 +8,7 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 ## Fluxo
 
-- **Home:** spinner inicial sem texto visual, dados salvos e última sincronização compacta no rodapé, sem botão Sincronizar. Ranking / Partidas / Ajustes permanecem no menu inferior; Cartas está desabilitado. O rodapé usa versão do pacote e revisão real do build.
+- **Home:** spinner inicial sem texto visual, dados salvos e última sincronização compacta no rodapé, sem botão Sincronizar. Ranking / Partidas / Ajustes permanecem no menu inferior; Cartas está desabilitado. O rodapé mostra apenas a versão do app; o identificador do build fica no título para diagnóstico.
 - **Quem veio hoje:** chips de largura natural, marca de seleção, cadastro na mesma tela. O × abre desativação, independentemente da presença. Desativar exige conexão e palavra-chave validada pelo servidor; não apaga histórico. Nome igual normalizado oferece reativação explícita da identidade anterior, sem mesclar homônimos silenciosamente.
 - **Pré-jogo:** sorteio, arraste ou seleção → Mover, novo sorteio e Iniciar partida. Cada time recebe um dos papéis complementares Começa no saque / Escolhe o lado. Times e atribuições ficam congelados após iniciar.
 - **Partidas:** abas Em andamento / Finalizadas. Counter de duas casas por time, layout em linhas, sem botão Salvar. O placar provisório acompanha a sessão aberta; somente finalizar cria o resultado persistido, com confirmação e vencedor calculado pelo servidor.
@@ -61,3 +61,9 @@ A fila transacional do IndexedDB funciona como registro das alterações: não f
 Falha preserva a fila e tenta novamente no próximo intervalo. Resposta incerta conserva UUID e payload para recuperar o recibo; conflito, desativação pendente e envios antigos continuam exigindo revisão. Desativação autorizada/importação são ações online explícitas, fora do envio periódico comum. O horário no rodapé só muda após uma consulta remota concluída; estados pendentes/falha/offline não fingem sincronização completa.
 
 O timer pertence à sessão aberta. Navegadores podem suspender abas; ao voltar ao app ou recuperar conexão, um ciclo vencido é retomado sem disparar todos os intervalos perdidos. App fechado não executa polling. O placar provisório continua em memória da sessão, sem envio por incremento: somente finalizar enfileira o resultado oficial, conforme a decisão já aprovada.
+
+## Releases e atualização do app
+
+A versão do app começa em **0.1.0**, independente do DS. O rodapé mostra `vX.Y.Z`; releases seguintes são propostas automaticamente com changelog a partir de commits convencionais. O merge de código executa CI e prepara uma PR de release; o merge dessa segunda PR, após validação, cria a tag/GitHub Release e publica o app. Não há mais deploy a cada merge de implementação. A criação automática de PRs depende da permissão do GitHub descrita em [Releases](docs/releases.md).
+
+Novas versões do PWA são verificadas automaticamente a cada 5 minutos e preparadas em segundo plano. Home/Ajustes avisam quando há atualização; somente a aba que confirma **Atualizar agora** recarrega. Isso evita perder placar provisório ou texto digitado durante uma atualização inesperada. Os dados salvos no aparelho permanecem preservados. App fechado/offline não tem garantia de atualização imediata. Veja os limites e a migração inicial em [Releases](docs/releases.md).
