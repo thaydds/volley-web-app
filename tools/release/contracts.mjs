@@ -13,3 +13,7 @@ export function validateReleaseTag(tag, version) {
     throw new Error('Release tag must match the stable app version');
   return tag;
 }
+
+export function isReleaseBranch(name) {
+  return /^release-please--branches--main(?:--components--volley-web-app)?$/.test(name);
+}

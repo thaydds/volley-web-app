@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validatedRun, validateReleaseTag } from './contracts.mjs';
+import { validatedRun, validateReleaseTag, isReleaseBranch } from './contracts.mjs';
+import { execFileSync } from 'node:child_process';
 const run = {
   event: 'push',
   head_branch: 'main',
@@ -36,4 +37,31 @@ test('the first structured release and lockfile agree; future versions are calcu
   assert.equal(config['include-component-in-tag'], false);
   assert.equal(config['release-as'], undefined);
   assert.match(config['bootstrap-sha'], /^[a-f\d]{40}$/);
+});
+
+test('Release Please compact JSON is accepted by formatting while version metadata remains validated', () => {
+  const manifest = JSON.parse(readFileSync('.release-please-manifest.json', 'utf8'));
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+  if (manifest['.'] !== undefined) assert.equal(manifest['.'], pkg.version);
+  const info = (path) =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        ['node_modules/prettier/bin/prettier.cjs', '--file-info', path],
+        { encoding: 'utf8' }
+      )
+    );
+  assert.equal(info('.release-please-manifest.json').ignored, true);
+  assert.equal(info('src/main.tsx').ignored, false);
+});
+test('dispatch recognizes both root release branch forms without matching unrelated work', () => {
+  assert.equal(isReleaseBranch('release-please--branches--main'), true);
+  assert.equal(isReleaseBranch('release-please--branches--main--components--volley-web-app'), true);
+  for (const branch of [
+    'main',
+    'feature/example',
+    'release-please--branches--other',
+    'release-please--branches--main--components--other',
+  ])
+    assert.equal(isReleaseBranch(branch), false);
 });
