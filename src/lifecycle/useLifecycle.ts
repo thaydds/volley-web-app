@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LifecycleEngine, lifecycleError } from './engine';
 import { LifecycleTransport } from './transport';
+import { startPolling, SYNC_INTERVAL } from './polling';
 import { emptyState, project, type LocalState } from './domain';
 const engines = new Map<string, LifecycleEngine>();
 function safeStorage(): Storage {
@@ -33,6 +34,7 @@ export function useLifecycle(apiUrl: string) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
   const [online, setOnline] = useState(navigator.onLine);
   const [error, setError] = useState('');
   const running = useRef(false);
@@ -59,28 +61,39 @@ export function useLifecycle(apiUrl: string) {
     window.addEventListener('online', connection);
     window.addEventListener('offline', connection);
     window.addEventListener('focus', local);
-    void (async () => {
+    const stopPolling = startPolling(async () => {
+      let started = false;
       try {
+        if (running.current) return Date.now() + SYNC_INTERVAL;
         const saved = await engine.store.read();
-        if (!live) return;
+        if (!live) return Date.now() + SYNC_INTERVAL;
         setState(saved);
         if (saved.base) setReady(true);
-        if (navigator.onLine) await engine.refresh();
-        else if (!saved.base) throw new Error('offline_without_cache');
+        if (!saved.base && !navigator.onLine) throw new Error('offline_without_cache');
+        const nextAt = await engine.poll(() => {
+          started = true;
+          if (live) setSyncing(true);
+        });
         if (live) {
           setState(await engine.store.read());
-          setError('');
+          if (started) setSyncError('');
         }
+        return nextAt;
       } catch (e) {
-        if (live) setError(lifecycleError(e));
+        if (live) setSyncError(lifecycleError(e));
+        return Date.now() + SYNC_INTERVAL;
       } finally {
-        if (live) setReady(true);
+        if (live) {
+          setSyncing(false);
+          setReady(true);
+        }
       }
-    })();
+    });
     return () => {
       live = false;
       mounted.current = false;
       unsubscribe();
+      stopPolling();
       window.removeEventListener('online', connection);
       window.removeEventListener('offline', connection);
       window.removeEventListener('focus', local);
@@ -112,19 +125,6 @@ export function useLifecycle(apiUrl: string) {
       if (mounted.current) setBusy(false);
     }
   }
-  async function synchronize() {
-    setSyncing(true);
-    try {
-      return await run(() => engine.retry());
-    } finally {
-      setSyncing(false);
-    }
-  }
-  async function retryInitial() {
-    setReady(false);
-    await run(() => engine.refresh());
-    setReady(true);
-  }
   const data = useMemo(
     () => project({ ...emptyState(), base: state.base, queue: state.queue }),
     [state.base, state.queue]
@@ -138,12 +138,12 @@ export function useLifecycle(apiUrl: string) {
     syncing,
     online,
     error,
+    syncError,
     setError,
     run,
-    synchronize,
-    retryInitial,
     reload,
-    locked: busy || !!state.deactivation || !!(state.lease && state.lease.until > Date.now()),
+    locked: busy || !!state.deactivation,
+    cloudLocked: busy || !!state.deactivation || !!(state.lease && state.lease.until > Date.now()),
     pending: state.queue.length + state.legacyPending.length + (state.deactivation ? 1 : 0),
   };
 }

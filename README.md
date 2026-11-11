@@ -8,12 +8,12 @@ PWA React + TypeScript para organizar vôlei, com jogadores e partidas compartil
 
 ## Fluxo
 
-- **Home:** spinner inicial sem texto visual, dados salvos, última sincronização e botão Sincronizar. Ranking / Partidas / Ajustes permanecem no menu inferior; Cartas está desabilitado. O rodapé usa versão do pacote e revisão real do build.
+- **Home:** spinner inicial sem texto visual, dados salvos e última sincronização compacta no rodapé, sem botão Sincronizar. Ranking / Partidas / Ajustes permanecem no menu inferior; Cartas está desabilitado. O rodapé usa versão do pacote e revisão real do build.
 - **Quem veio hoje:** chips de largura natural, marca de seleção, cadastro na mesma tela. O × abre desativação, independentemente da presença. Desativar exige conexão e palavra-chave validada pelo servidor; não apaga histórico. Nome igual normalizado oferece reativação explícita da identidade anterior, sem mesclar homônimos silenciosamente.
 - **Pré-jogo:** sorteio, arraste ou seleção → Mover, novo sorteio e Iniciar partida. Cada time recebe um dos papéis complementares Começa no saque / Escolhe o lado. Times e atribuições ficam congelados após iniciar.
 - **Partidas:** abas Em andamento / Finalizadas. Counter de duas casas por time, layout em linhas, sem botão Salvar. O placar provisório acompanha a sessão aberta; somente finalizar cria o resultado persistido, com confirmação e vencedor calculado pelo servidor.
 - **Finalizadas:** somente consulta, inclusive offline; sem editar ou excluir. Revanche prepara outra partida e preserva a anterior. Resultados antigos sem placar continuam com vencedor e `—`, sem pontos inventados.
-- **Offline:** com cache, permite cadastrar, preparar, iniciar e finalizar. Cada ação só é confirmada após persistência no IndexedDB. Sincronizar envia a fila em ordem e consulta a base; reconectar não envia automaticamente. Conflitos e respostas incertas preservam a fila até recuperação explícita. Desativação e importação são online.
+- **Offline:** com cache, permite cadastrar, preparar, iniciar e finalizar. Cada ação só é confirmada após persistência no IndexedDB. A cada 5 minutos, com o app aberto e online, envia a fila em ordem. Sem alterações locais, não faz escritas. Uma consulta de revisão busca alterações de outros aparelhos; histórico só é baixado quando necessário. Reconectar ou voltar à aba verifica um ciclo vencido, sem antecipar um intervalo ainda vigente. Conflitos exigem revisão; respostas incertas são repetidas com o mesmo UUID no próximo ciclo. Desativação e importação são online.
 - **Ranking:** calculado por UUID a partir dos resultados disponíveis, incluindo projeção das finalizações locais pendentes. Uma vitória vale um ponto; histórico de desativados é preservado.
 
 ## Desenvolvimento e validação
@@ -46,8 +46,18 @@ CI valida PRs. O workflow de deploy existente publica `main` no GitHub Pages; es
 
 Fonte: Figma Counter2197:11752, partida2184:16993, confirmação2184:20090. O Counter usa2 casas (00–99), entrada única e botões por time. Placar fora desse intervalo vindo da API antiga permanece visível e inválido até correção explícita; não é truncado. Finalizadas históricas continuam numéricas e conservam seus resultados.
 
-Decisão desta implementação: acompanhamento somente em memória da sessão aberta do app. Navegar entre lista/detalhe/Home conserva os números; recarregar ou fechar descarta o provisório não finalizado e reabre o último valor conhecido do servidor/legado (ou00). Não há escrita de save_score, autosave, envio por toque ou realtime. Finalizar cria finish_match na fila persistida existente e bloqueia edição local; Sincronizar compartilha o resultado. Iniciar partida continua uma operação persistida, pois representa o jogo em andamento, sem resultado/ranking oficial.
+Decisão desta implementação: acompanhamento somente em memória da sessão aberta do app. Navegar entre lista/detalhe/Home conserva os números; recarregar ou fechar descarta o provisório não finalizado e reabre o último valor conhecido do servidor/legado (ou00). Não há escrita de save_score, autosave, envio por toque ou realtime. Finalizar cria finish_match na fila persistida existente e bloqueia edição local; O próximo ciclo automático compartilha o resultado. Iniciar partida continua uma operação persistida, pois representa o jogo em andamento, sem resultado/ranking oficial.
 
 A API/banco não mudam nesta PR. A rota save_score continua para compatibilidade e recuperação de envios anteriores. Se um cliente antigo alterar a versão, a sessão preserva seu acompanhamento e exige revisão explícita antes de finalizar. Persistir o provisório entre recarregamentos ou sincronizá-lo exige decisão posterior; não foi assumido aqui.
 
 Dependência: components0.8.0 publicada (PR26 do DS), fixada no lockfile. O artefato de revisão foi removido e a suíte foi revalidada contra a release publicada. Sem merge ou deploy nesta entrega.
+
+## Sincronização automática · 11 nov 2026
+
+A fila transacional do IndexedDB funciona como registro das alterações: não fazemos comparação profunda, hash/JSON do histórico por toque nem sobrescrita do banco com um snapshot local inteiro. Apenas comandos pendentes são enviados. Sem fila, a API existente recebe uma consulta de `state` com `resource=players, limit=1`, cuja revisão é global; só se ela mudou é feito o download paginado e consistente do histórico. Após envios, a base é consultada integralmente para incluir mudanças concorrentes de outros aparelhos.
+
+`lastAutoSyncAttempt` e a posse temporária do envio são adquiridos atomicamente no IndexedDB. Abas compartilham o intervalo; recarregar não envia antes da hora. Um lote captura os UUIDs existentes no início; ações criadas durante a rede permanecem locais para o próximo ciclo. Chips e Counters continuam interativos, sem depender da resposta da rede. Nenhuma biblioteca nova, migração ou alteração da API é necessária.
+
+Falha preserva a fila e tenta novamente no próximo intervalo. Resposta incerta conserva UUID e payload para recuperar o recibo; conflito, desativação pendente e envios antigos continuam exigindo revisão. Desativação autorizada/importação são ações online explícitas, fora do envio periódico comum. O horário no rodapé só muda após uma consulta remota concluída; estados pendentes/falha/offline não fingem sincronização completa.
+
+O timer pertence à sessão aberta. Navegadores podem suspender abas; ao voltar ao app ou recuperar conexão, um ciclo vencido é retomado sem disparar todos os intervalos perdidos. App fechado não executa polling. O placar provisório continua em memória da sessão, sem envio por incremento: somente finalizar enfileira o resultado oficial, conforme a decisão já aprovada.

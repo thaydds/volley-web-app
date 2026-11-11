@@ -36,8 +36,7 @@ export function usePresenceSelection(options: Options) {
         const batch = [...intents.current.values()];
         intents.current.clear();
         await current.current.store.edit((state) => {
-          if (state.deactivation || (state.lease && state.lease.until > Date.now()))
-            throw new ApiError(0, 'sync_running');
+          if (state.deactivation) throw new ApiError(0, 'sync_running');
           for (const intent of batch)
             state.presence = assign(state.presence, intent.id, intent.selected);
         });

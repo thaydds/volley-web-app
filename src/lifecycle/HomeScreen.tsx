@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Badge, Button, Card, Typography } from '@beachsports/components';
+import { Button, Card, Typography } from '@beachsports/components';
 import { Page } from './Page';
 import styles from './LifecycleApp.module.css';
 declare const __APP_BUILD_VERSION__: string;
@@ -7,11 +7,9 @@ export function HomeScreen({
   status,
   syncedAt,
   online,
-  locked,
   syncing,
   pending,
   error,
-  onSync,
   onRanking,
   onMatches,
   onSettings,
@@ -21,11 +19,9 @@ export function HomeScreen({
   status: string;
   syncedAt?: string;
   online: boolean;
-  locked: boolean;
   syncing: boolean;
   pending: number;
   error: string;
-  onSync: () => void;
   onRanking: () => void;
   onMatches: () => void;
   onSettings: () => void;
@@ -33,10 +29,21 @@ export function HomeScreen({
   children?: ReactNode;
 }) {
   const date = syncedAt ? new Date(syncedAt) : null;
-  const time =
-    date?.toLocaleDateString('pt-BR') === new Date().toLocaleDateString('pt-BR')
-      ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      : date?.toLocaleString('pt-BR');
+  const time = date?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const last = date ? `última ${time}` : 'sem sync';
+  const compact = !online
+    ? `Offline · ${last}`
+    : syncing
+      ? 'Sincronizando…'
+      : status === 'review'
+        ? 'Revisão pendente'
+        : status === 'failure'
+          ? `Falha · ${last}`
+          : pending
+            ? 'Envio pendente'
+            : date
+              ? `Última sync ${time}`
+              : 'Ainda sem sync';
   return (
     <Page
       title="Bora pra areia?"
@@ -56,40 +63,33 @@ export function HomeScreen({
               Ajustes
             </Button>
           </nav>
-          <Typography variant="text-s" tone="secondary">
-            Beach Sports · v{__APP_BUILD_VERSION__}
-          </Typography>
+          <div className={styles.syncFooter}>
+            <Typography
+              variant="label-s"
+              tone="secondary"
+              className={styles.version}
+              title={`Versão ${__APP_BUILD_VERSION__}`}
+            >
+              v{__APP_BUILD_VERSION__}
+            </Typography>
+            <Typography
+              variant="label-s"
+              tone="secondary"
+              role="status"
+              className={styles.syncStatus}
+              data-testid="sync-status"
+              title={
+                date
+                  ? `Última sincronização confirmada: ${date.toLocaleString('pt-BR')}`
+                  : undefined
+              }
+            >
+              {compact}
+            </Typography>
+          </div>
         </>
       }
     >
-      <div role="status">
-        <Badge
-          size="sm"
-          tone={pending || !online ? 'info' : error ? 'danger' : 'success'}
-          label={status}
-        />
-      </div>
-      <Typography variant="text-s" tone="secondary">
-        {date ? (
-          <>
-            Última sincronização às{' '}
-            <time dateTime={date.toISOString()} title={date.toLocaleString('pt-BR')}>
-              {time}
-            </time>
-          </>
-        ) : (
-          'Ainda não sincronizado'
-        )}
-      </Typography>
-      <Button
-        variant="secondary"
-        className={styles.full}
-        disabled={!online || locked}
-        loading={syncing}
-        onClick={onSync}
-      >
-        Sincronizar
-      </Button>
       {error && (
         <Typography role="alert" className={styles.error}>
           {error}

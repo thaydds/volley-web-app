@@ -47,6 +47,7 @@ export type Deactivation = {
 };
 export type LocalState = {
   schema: 2;
+  lastAutoSyncAttempt?: number;
   base: Snapshot | null;
   queue: Command[];
   presence: string[];
@@ -238,6 +239,13 @@ export function validLocal(v: unknown): v is LocalState {
         isObject(p.input) &&
         (p.action === 'import' || (p.action === 'mutate' && typeof p.operation === 'string'))
     )
+  )
+    return false;
+  if (
+    v.lastAutoSyncAttempt !== undefined &&
+    (typeof v.lastAutoSyncAttempt !== 'number' ||
+      !Number.isFinite(v.lastAutoSyncAttempt) ||
+      v.lastAutoSyncAttempt < 0)
   )
     return false;
   if (

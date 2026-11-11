@@ -1,5 +1,6 @@
 import { ApiError, errorMessage } from '../shared/client';
 import { LocalStore } from './store';
+import { SYNC_INTERVAL } from './polling';
 import { LifecycleTransport } from './transport';
 import {
   emptyState,
@@ -36,7 +37,7 @@ export function lifecycleError(error: unknown): string {
       not_found:
         'O serviço ainda não oferece esta versão da API. Suas alterações estão preservadas.',
       entity_not_found: 'O registro não está mais disponível. Revise as alterações pendentes.',
-      queue_full: 'Há muitas alterações pendentes. Sincronize antes de continuar.',
+      queue_full: 'Há muitas alterações pendentes. Aguarde a sincronização automática.',
     };
     if (messages[error.code]) return messages[error.code];
   }
@@ -113,7 +114,6 @@ export class LifecycleEngine {
     };
     if (!validCommand(command)) throw new ApiError(400, 'invalid_command');
     await this.store.edit((state) => {
-      if (state.lease && state.lease.until > Date.now()) throw new ApiError(0, 'sync_running');
       if (state.deactivation) throw new ApiError(0, 'pending_deactivation');
       if (state.queue.length >= 5000) throw new ApiError(0, 'queue_full');
       const data = project(state);
@@ -149,7 +149,14 @@ export class LifecycleEngine {
     });
     return String(input.id);
   }
-  async refresh() {
+  async refresh(onlyIfChanged = false) {
+    const saved = await this.store.read();
+    if (onlyIfChanged && saved.base && !(await this.transport.changedSince(saved.base.revision))) {
+      await this.store.edit((state) => {
+        if (state.base) state.base.syncedAt = new Date().toISOString();
+      });
+      return;
+    }
     const remote = await this.transport.readState();
     await this.store.edit((state) => {
       if (!state.base || newer(remote.revision, state.base.revision)) state.base = remote;
@@ -167,17 +174,71 @@ export class LifecycleEngine {
       if (state.lease?.owner === this.owner) state.lease = null;
     });
   }
+  private polling = false;
+  /** Durable outbox is the change journal: never hash or upload a complete snapshot. */
+  async poll(onStart: () => void = () => {}): Promise<number> {
+    if (this.polling || !navigator.onLine) return Date.now() + SYNC_INTERVAL;
+    this.polling = true;
+    try {
+      const saved = await this.store.read();
+      const dueAt = (saved.lastAutoSyncAttempt ?? 0) + SYNC_INTERVAL;
+      if (dueAt > Date.now()) return dueAt;
+      if (
+        saved.base &&
+        (saved.deactivation ||
+          saved.legacyPending.length ||
+          saved.queue.some((command) => command.error && command.error !== 'uncertain'))
+      )
+        return Date.now() + SYNC_INTERVAL;
+      // Claim the interval and sender in ONE transaction across every tab.
+      await this.store.edit((state) => {
+        if (
+          (state.lastAutoSyncAttempt ?? 0) + SYNC_INTERVAL > Date.now() ||
+          (state.lease && state.lease.until > Date.now())
+        )
+          throw new ApiError(0, 'sync_not_due');
+        if (
+          state.base &&
+          (state.deactivation ||
+            state.legacyPending.length ||
+            state.queue.some((command) => command.error && command.error !== 'uncertain'))
+        )
+          throw new ApiError(0, 'sync_not_due');
+        state.lastAutoSyncAttempt = Date.now();
+        state.lease = { owner: this.owner, until: Date.now() + 60000 };
+        if (state.queue[0]?.error === 'uncertain') delete state.queue[0].error;
+      });
+      onStart();
+      if (!saved.base && (saved.legacyPending.length || saved.deactivation)) {
+        // An old pending intent must never prevent initial read-only recovery.
+        try {
+          await this.refresh();
+        } finally {
+          await this.unlock();
+        }
+      } else await this.synchronize();
+      return Date.now() + SYNC_INTERVAL;
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'sync_not_due')
+        return Date.now() + SYNC_INTERVAL;
+      throw error;
+    } finally {
+      this.polling = false;
+    }
+  }
   async synchronize() {
     if (!navigator.onLine) throw new ApiError(0, 'offline');
     await this.lease();
     try {
+      // Bound this batch. New local actions remain responsive and wait for the next cycle.
+      const batch = new Set((await this.store.read()).queue.map((command) => command.request_id));
       for (;;) {
         await this.lease();
         const state = await this.store.read();
         if (state.legacyPending.length) throw new ApiError(0, 'legacy_pending');
         if (state.deactivation) throw new ApiError(0, 'pending_deactivation');
         const command = state.queue[0];
-        if (!command) break;
+        if (!command || !batch.has(command.request_id)) break;
         if (command.error)
           throw new ApiError(command.error === 'conflict' ? 409 : 400, command.error);
         let result: Record<string, unknown>;
@@ -205,7 +266,7 @@ export class LifecycleEngine {
           current.queue = current.queue.filter((c) => c.request_id !== command.request_id);
         });
       }
-      await this.refresh();
+      await this.refresh(batch.size === 0);
     } finally {
       await this.unlock();
     }
@@ -280,7 +341,7 @@ export class LifecycleEngine {
         state.deactivation = null;
         state.presence = state.presence.filter((p) => p !== id);
       });
-      // The validated acknowledgement is durable. Refresh unrelated records on manual sync.
+      // The validated acknowledgement is durable. Refresh unrelated records on the next automatic cycle.
     } finally {
       await this.unlock();
     }
