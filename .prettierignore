@@ -10,3 +10,6 @@ public/manifest.webmanifest
 
 test-results
 playwright-report
+
+# Release Please renders its own changelog.
+CHANGELOG.md

@@ -10,5 +10,11 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["supabase/**/*.ts", "e2e/**/*.ts", "vitest.backend.config.ts"]
+  "include": [
+    "supabase/**/*.ts",
+    "e2e/**/*.ts",
+    "vitest.backend.config.ts",
+    "pwa-e2e/**/*.ts",
+    "playwright.pwa.config.ts"
+  ]
 }

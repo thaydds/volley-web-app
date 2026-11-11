@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { Button, Card, Typography } from '@beachsports/components';
 import { Page } from './Page';
 import styles from './LifecycleApp.module.css';
-declare const __APP_BUILD_VERSION__: string;
+declare const __APP_VERSION__: string;
+declare const __APP_BUILD_ID__: string;
 export function HomeScreen({
   status,
   syncedAt,
@@ -68,9 +69,9 @@ export function HomeScreen({
               variant="label-s"
               tone="secondary"
               className={styles.version}
-              title={`Versão ${__APP_BUILD_VERSION__}`}
+              title={`Versão ${__APP_VERSION__} · Build ${__APP_BUILD_ID__}`}
             >
-              v{__APP_BUILD_VERSION__}
+              v{__APP_VERSION__}
             </Typography>
             <Typography
               variant="label-s"
