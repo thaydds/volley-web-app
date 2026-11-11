@@ -1,7 +1,7 @@
 {
   "name": "volley-web-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "homepage": "https://thaydds.github.io/volley-web-app",
   "scripts": {
