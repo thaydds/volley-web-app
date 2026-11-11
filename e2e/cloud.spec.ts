@@ -6,6 +6,7 @@ import {
   finish,
   home,
   synchronized,
+  pollCycle,
   outbox,
   apiUrl,
 } from './lifecycle.helpers';
@@ -65,8 +66,8 @@ test('lost acknowledgement replays the identical operation after session recreat
   await home(page);
   const requests = (await outbox(page)).queue.map((c) => c.request_id);
   backend.dropNextWrite = true;
-  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await pollCycle(page);
+  await expect(page.getByTestId('sync-status')).toContainText('Falha');
   expect((await backend.matches()).length).toBe(1);
   expect((await outbox(page)).queue.map((c) => c.request_id)).toEqual(requests);
   await page.evaluate(
@@ -94,6 +95,7 @@ test('two independent devices retain a conflict until explicit review, never ove
   const other = await browser.newContext({ baseURL, serviceWorkers: 'block' });
   await backend.route(other);
   const second = await other.newPage();
+  await second.clock.install();
   try {
     await second.goto('./');
     await expect(second.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
@@ -113,7 +115,7 @@ test('two independent devices retain a conflict until explicit review, never ove
     await score(second, '25', '19');
     await finish(second);
     await home(second);
-    await second.getByRole('button', { name: 'Sincronizar', exact: true }).click();
+    await pollCycle(second);
     await expect(second.getByRole('button', { name: 'Revisar conflito' })).toBeVisible();
     expect((await outbox(second)).queue).toHaveLength(1);
     expect((await backend.matches())[0]).toMatchObject({ score_a: 21, score_b: 18 });
@@ -138,8 +140,8 @@ test('a failed refresh preserves cached data and a storage failure never acknowl
 }) => {
   await seed(page, backend);
   backend.failReads = true;
-  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await pollCycle(page);
+  await expect(page.getByTestId('sync-status')).toContainText('Falha');
   await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await expect(page.getByRole('button', { name: 'André', exact: true })).toBeVisible();
   await page.evaluate(() => {
@@ -185,7 +187,7 @@ test('lost deactivation acknowledgement persists no authorization word and repla
     backend.testAuthorizationWord
   );
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Sincronizar', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
   await page.getByLabel('Nome do jogador').fill('Must wait for deactivation');
   await expect(page.getByRole('button', { name: 'Adicionar', exact: true })).toBeDisabled();
@@ -204,7 +206,7 @@ test('lost deactivation acknowledgement persists no authorization word and repla
   });
 });
 
-test('provisional scores stay in their tab; legacy updates require review and sync lease remains shared', async ({
+test('provisional scores stay in their tab; legacy updates require review and background sync keeps presence responsive across tabs', async ({
   page,
   context,
   backend,
@@ -214,6 +216,7 @@ test('provisional scores stay in their tab; legacy updates require review and sy
   await home(page);
   await synchronized(page);
   const second = await context.newPage();
+  await second.clock.install();
   let release = () => {};
   try {
     await second.goto('./');
@@ -270,11 +273,16 @@ test('provisional scores stay in their tab; legacy updates require review and sy
     backend.writeGate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
-    await expect(second.getByRole('button', { name: 'Sincronizar', exact: true })).toBeDisabled();
+    await pollCycle(page);
+    await expect.poll(async () => (await outbox(second)).lease).not.toBeNull();
+    await second.getByRole('button', { name: 'Preparar nova partida', exact: true }).click();
+    const chip = second.getByRole('button', { name: 'André', exact: true });
+    await expect(chip).toBeEnabled();
+    await chip.click();
+    await home(second);
     release();
     backend.writeGate = null;
-    await expect(page.getByText('Tudo sincronizado', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('sync-status')).toContainText('Última sync');
     await page.reload();
     await page
       .getByRole('navigation')
@@ -446,8 +454,10 @@ test('offline v1 cache preserves archived unfinished games as read-only, without
   await page.keyboard.press('Enter');
   await expect(page.getByRole('textbox')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Finalizar partida', exact: true })).toHaveCount(0);
-  // Reading the legacy seed need not create a new IDB record. The original is durable.
-  expect(await outbox(page)).toBeUndefined();
+  // The automatic attempt persists scheduling metadata, without changing legacy data.
+  const local = await outbox(page);
+  expect(local.queue).toEqual([]);
+  expect(local.base).toMatchObject({ archived: [{ ...archived, deleted_at: null }] });
   expect(
     JSON.parse(
       (await page.evaluate(

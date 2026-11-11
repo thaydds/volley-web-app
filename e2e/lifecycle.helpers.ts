@@ -59,9 +59,17 @@ export async function home(page: Page) {
     await page.getByRole('button', { name: 'Voltar', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
 }
+export async function pollCycle(page: Page) {
+  const state = await outbox(page);
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.fastForward(
+    Math.max(1, Number(state?.lastAutoSyncAttempt ?? now) + 301000 - now)
+  );
+}
 export async function synchronized(page: Page) {
-  await page.getByRole('button', { name: 'Sincronizar', exact: true }).click();
-  await expect(page.getByText('Tudo sincronizado', { exact: true })).toBeVisible();
+  await pollCycle(page);
+  await expect.poll(async () => (await outbox(page)).queue.length).toBe(0);
+  await expect(page.getByTestId('sync-status')).toContainText('Última sync');
 }
 export async function outbox(page: Page): Promise<{
   queue: Array<{ request_id: string; input: Record<string, unknown> }>;

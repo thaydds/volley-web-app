@@ -1,5 +1,15 @@
 # Referências de design e evolução do Volley
 
+## Atualização atual: sincronização automática · 11 nov 2026
+
+Fonte: [Home mobile Light 320px](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P?node-id=2205-21324), contexto e screenshot consultados antes da implementação. Demais referências entregues pelo Design: Dark `2205:21352`, offline `2205:21380`, falha `2205:21552`, nunca sincronizado `2205:21576`, notas `2184:22241`.
+
+Botão Sincronizar e retry de rede foram removidos. Rodapé com versão real à esquerda e status compacto à direita: Última sync HH:mm, Offline · última HH:mm, Envio pendente, Sincronizando…, Falha · última HH:mm ou Ainda sem sync. Revisão pendente é mantida quando há conflito/autorização/envio antigo. Data completa fica no título acessível do status; versão longa pode abreviar visualmente, preservando o valor completo no título. CSS Modules e Typography do DS, sem novos tokens.
+
+A usuária definiu o intervalo de 5 minutos. A fila persistida identifica alterações sem comparar todo o histórico; ver README para concorrência, revisão global, retomada e limites de execução. A configuração do backend permanece compatível e não exige deploy/migração. Os horários e v0.1.2 do Figma são ilustrativos, não valores fixados no app.
+
+As propostas abaixo são histórico; a seção atual prevalece para sincronização.
+
 ## Proposta atual: API e ciclo offline · 10 nov 2026
 
 Fonte: [frames atuais](https://www.figma.com/design/baO5SbbaGO01QTGc8d5M0P/volei-app--Copy-?node-id=2124-9496), inspecionados por screenshots e metadata; nenhum write no Figma. Implementação em revisão, sem publicação.

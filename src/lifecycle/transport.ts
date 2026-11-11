@@ -13,6 +13,24 @@ export class LifecycleTransport extends VolleyClient {
       throw new ApiError(0, 'storage_corrupt');
     }
   }
+  /** Probe the global revision with one bounded row before downloading history. */
+  async changedSince(revision: string): Promise<boolean> {
+    const response = await this.authenticated('state', {
+      resource: 'players',
+      limit: 1,
+      offset: 0,
+    });
+    if (
+      !isObject(response) ||
+      !Array.isArray(response.items) ||
+      response.items.length > 1 ||
+      !response.items.every(validPlayer) ||
+      typeof response.revision !== 'string' ||
+      !/^\d+$/.test(response.revision)
+    )
+      throw new ApiError(502, 'invalid_lifecycle_data');
+    return response.revision !== revision;
+  }
   async readState(): Promise<Snapshot> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const revisions = new Set<string>();

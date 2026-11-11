@@ -10,6 +10,7 @@ export const test = base.extend<{ backend: Backend }>({
     await backend.close();
   },
   page: async ({ page, backend }, provide) => {
+    await page.clock.install();
     registerBackend(page, backend);
     await provide(page);
   },

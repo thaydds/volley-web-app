@@ -325,8 +325,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           <Typography>
             Os dados não estão disponíveis neste aparelho. Conecte-se e tente novamente.
           </Typography>
-          {alert}
-          <Button onClick={() => void sync.retryInitial()}>Tentar novamente</Button>
+          <Typography role="alert">{sync.syncError || sync.error}</Typography>
           <Button variant="ghost" onClick={() => void backup()}>
             Exportar backup local
           </Button>
@@ -336,21 +335,12 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
   const collection = archived ? data.archived : data.matches;
   const game = [...data.matches, ...data.archived].find((m) => m.id === gameId);
   const offlineFinal = game?.status === 'finished' && pendingFor(game.id);
-  const status = sync.syncing
-    ? 'Sincronizando…'
-    : !sync.online
-      ? sync.pending
-        ? 'Offline · alterações pendentes'
-        : 'Offline · dados salvos'
-      : queueProblem
-        ? 'Conflito · revisão necessária'
-        : state.queue.some((c) => c.error === 'uncertain')
-          ? 'Resposta incerta · alterações preservadas'
-          : sync.pending
-            ? `${sync.pending} ${sync.pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`
-            : sync.error
-              ? 'Falha na sincronização'
-              : 'Tudo sincronizado';
+  const status =
+    queueProblem || state.deactivation || state.legacyPending.length
+      ? 'review'
+      : sync.syncError
+        ? 'failure'
+        : '';
   return (
     <div className={styles.shell}>
       {view === 'home' && (
@@ -358,11 +348,9 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
           status={status}
           syncedAt={state.base?.syncedAt}
           online={sync.online}
-          locked={sync.locked}
           syncing={sync.syncing}
           pending={sync.pending}
           error={sync.error}
-          onSync={() => void sync.synchronize()}
           onRanking={() => go('ranking')}
           onMatches={() => {
             setArchived(false);
@@ -561,7 +549,9 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
       )}
       {view === 'game' && !game && (
         <Page title="Partida indisponível" onBack={() => go('matches')}>
-          <Typography>Atualize os dados na Home ou consulte a lista de partidas.</Typography>
+          <Typography>
+            Aguarde a sincronização automática ou consulte a lista de partidas.
+          </Typography>
         </Page>
       )}
       {view === 'ranking' && (
@@ -584,8 +574,8 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
             finalizar, o resultado fica somente para consulta.
           </Typography>
           <Typography>
-            4. Na Home, use Sincronizar quando houver conexão para enviar suas alterações e buscar
-            as de outros dispositivos.
+            4. Com o app aberto e conectado, a sincronização acontece automaticamente a cada 5
+            minutos. As alterações ficam guardadas neste aparelho até o envio.
           </Typography>
           <Typography variant="text-s">
             Você pode preparar, iniciar e finalizar offline com os dados já carregados. Desativar
@@ -608,7 +598,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
             {legacy && (
               <Button
                 variant="secondary"
-                disabled={!sync.online || sync.locked || sync.pending > 0}
+                disabled={!sync.online || sync.cloudLocked || sync.pending > 0}
                 onClick={() => setImportOpen(true)}
               >
                 Importar histórico deste aparelho
@@ -673,7 +663,7 @@ export function LifecycleApp({ apiUrl }: { apiUrl: string }) {
             })) as CloudMatch[]
           }
           busy={sync.busy}
-          disabled={!sync.online || sync.locked || sync.pending > 0}
+          disabled={!sync.online || sync.cloudLocked || sync.pending > 0}
           error={sync.error}
           onCancel={() => setImportOpen(false)}
           onConfirm={importHistory}

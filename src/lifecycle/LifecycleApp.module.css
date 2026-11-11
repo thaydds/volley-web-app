@@ -195,3 +195,23 @@
 .finalWinner {
   align-self: flex-start;
 }
+
+.syncFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ds-space-8);
+}
+.version {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.syncStatus {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  text-align: end;
+  overflow-wrap: anywhere;
+}

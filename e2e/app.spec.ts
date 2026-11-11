@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './fixtures';
-import { seed, prepare, score, finish, home, synchronized } from './lifecycle.helpers';
+import { seed, prepare, score, finish, home, synchronized, pollCycle } from './lifecycle.helpers';
 
 for (const theme of ['light', 'dark'] as const) {
   test(`approved navigation, roster, pregame, scores and immutable result / ${theme}`, async ({
@@ -21,7 +21,7 @@ for (const theme of ['light', 'dark'] as const) {
     const nav = page.getByRole('navigation', { name: 'Navegação principal' });
     await expect(nav.getByRole('button')).toHaveText(['Ranking', 'Partidas', 'Ajustes']);
     await expect(page.getByRole('button', { name: 'Cartas', exact: true })).toBeDisabled();
-    await expect(page.getByText('Beach Sports · v', { exact: false })).toBeVisible();
+    await expect(page.locator('footer [title^="Versão"]')).toBeVisible();
     await prepare(page, ['André', 'Lana', 'Andressa', 'LL']);
     await expect(page.getByText('Começa no saque', { exact: true })).toHaveCount(1);
     await expect(page.getByText('Escolhe o lado', { exact: true })).toHaveCount(1);
@@ -202,9 +202,9 @@ test('initial loading is only a spinner, failures retry and settings keep prefer
     backend.readGate = null;
   }
   await expect(page.getByRole('heading', { name: 'Não foi possível carregar' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tentar novamente' })).toHaveCount(0);
   backend.failReads = false;
-  await page.getByRole('button', { name: 'Tentar novamente' }).click();
+  await pollCycle(page);
   await expect(page.getByRole('heading', { name: 'Bora pra areia?' })).toBeVisible();
   await page.getByRole('navigation').getByRole('button', { name: 'Ajustes' }).click();
   await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible();
